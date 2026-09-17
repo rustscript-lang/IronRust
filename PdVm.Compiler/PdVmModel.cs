@@ -30,6 +30,7 @@ public enum PdVmBytecodeOpCode : byte
     Not = 0x17,
     Lshr = 0x18,
     CallValue = 0x19,
+    CallScript = 0x1A,
 }
 
 public sealed record PdVmInstruction(
@@ -40,7 +41,8 @@ public sealed record PdVmInstruction(
     int? JumpTarget = null,
     byte? LocalIndex = null,
     ushort? CallIndex = null,
-    byte? ArgCount = null);
+    byte? ArgCount = null,
+    uint? PrototypeId = null);
 
 public readonly record struct PdVmOperandTypes(PdVmValueType Lhs, PdVmValueType Rhs);
 
@@ -139,6 +141,81 @@ public readonly record struct PdVmRootCallableBinding(ushort LocalSlot, uint Pro
 
 public sealed record PdVmExportedCallable(string Name, ushort LocalSlot);
 
+public enum PdVmHostParamPassing : byte
+{
+    Value = 0,
+    Borrow = 1,
+    BorrowMut = 2,
+    TakeOwned = 3,
+}
+
+public sealed record PdVmHostStructField(string Name, PdVmHostTypeSchema Type);
+
+public sealed record PdVmHostTypeSchema
+{
+    public PdVmHostTypeSchema(
+        PdVmHostTypeSchemaKind kind,
+        string? name = null,
+        PdVmHostTypeSchema? element = null,
+        IReadOnlyList<PdVmHostTypeSchema>? items = null,
+        PdVmHostTypeSchema? result = null,
+        IReadOnlyList<PdVmHostStructField>? fields = null)
+    {
+        Kind = kind;
+        Name = name;
+        Element = element;
+        Items = items ?? Array.Empty<PdVmHostTypeSchema>();
+        Result = result;
+        Fields = fields ?? Array.Empty<PdVmHostStructField>();
+    }
+
+    public PdVmHostTypeSchemaKind Kind { get; }
+
+    public string? Name { get; }
+
+    public PdVmHostTypeSchema? Element { get; }
+
+    public IReadOnlyList<PdVmHostTypeSchema> Items { get; }
+
+    public PdVmHostTypeSchema? Result { get; }
+
+    public IReadOnlyList<PdVmHostStructField> Fields { get; }
+}
+
+public enum PdVmHostTypeSchemaKind : byte
+{
+    Unknown = 0,
+    Null = 1,
+    Int = 2,
+    Float = 3,
+    Number = 4,
+    Bool = 5,
+    String = 6,
+    Bytes = 7,
+    Array = 8,
+    Map = 9,
+    Optional = 10,
+    Callable = 11,
+    Resource = 12,
+    Named = 13,
+}
+
+public sealed record PdVmHostImportParam(
+    string Name,
+    PdVmHostTypeSchema Schema,
+    PdVmHostParamPassing Passing);
+
+public sealed record PdVmHostImportSchema(
+    string Name,
+    IReadOnlyList<PdVmHostImportParam> Params,
+    PdVmHostTypeSchema ReturnType,
+    ulong Fingerprint);
+
+public sealed record PdVmNamedStructDecl(
+    string Name,
+    IReadOnlyList<string> TypeParams,
+    PdVmTypeSchema Body);
+
 public sealed class PdVmTypeMap
 {
     public PdVmTypeMap(
@@ -189,7 +266,9 @@ public sealed class PdVmProgramModel
         IReadOnlyList<PdVmCallablePrototype>? callablePrototypes = null,
         IReadOnlyList<PdVmFunctionRegion>? functionRegions = null,
         IReadOnlyList<PdVmRootCallableBinding>? rootCallableBindings = null,
-        IReadOnlyList<PdVmExportedCallable>? exportedCallables = null)
+        IReadOnlyList<PdVmExportedCallable>? exportedCallables = null,
+        IReadOnlyList<PdVmHostImportSchema?>? hostImportSchemas = null,
+        IReadOnlyList<PdVmNamedStructDecl>? namedStructDecls = null)
     {
         Constants = constants ?? throw new ArgumentNullException(nameof(constants));
         Code = code ?? throw new ArgumentNullException(nameof(code));
@@ -202,6 +281,12 @@ public sealed class PdVmProgramModel
         FunctionRegions = functionRegions ?? Array.Empty<PdVmFunctionRegion>();
         RootCallableBindings = rootCallableBindings ?? Array.Empty<PdVmRootCallableBinding>();
         ExportedCallables = exportedCallables ?? Array.Empty<PdVmExportedCallable>();
+        HostImportSchemas = hostImportSchemas ?? Array.Empty<PdVmHostImportSchema?>();
+        NamedStructDecls = namedStructDecls ?? Array.Empty<PdVmNamedStructDecl>();
+        if (HostImportSchemas.Count != 0 && HostImportSchemas.Count != Imports.Count)
+        {
+            throw new ArgumentException("host import schema count must match import count");
+        }
     }
 
     public IReadOnlyList<PdVmValue> Constants { get; }
@@ -225,4 +310,8 @@ public sealed class PdVmProgramModel
     public IReadOnlyList<PdVmRootCallableBinding> RootCallableBindings { get; }
 
     public IReadOnlyList<PdVmExportedCallable> ExportedCallables { get; }
+
+    public IReadOnlyList<PdVmHostImportSchema?> HostImportSchemas { get; }
+
+    public IReadOnlyList<PdVmNamedStructDecl> NamedStructDecls { get; }
 }

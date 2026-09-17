@@ -13,33 +13,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          path: IronRust
-      - uses: actions/checkout@v4
-        with:
-          repository: rustscript-lang/rustscript
-          path: rustscript
-      - uses: actions/checkout@v4
-        with:
-          repository: rustscript-lang/pd-edge
-          path: pd-edge
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Native compiler fmt
+        run: cargo fmt --all --check --manifest-path native/pd-vm-compiler/Cargo.toml
+      - name: Native compiler clippy
+        run: cargo clippy --locked --all-targets --all-features --manifest-path native/pd-vm-compiler/Cargo.toml -- -D warnings
       - name: Build native compiler
-        working-directory: IronRust
-        run: cargo build --locked --release --manifest-path native/pd-vm-compiler/Cargo.toml
+        run: cargo build --locked --release --all-targets --all-features --manifest-path native/pd-vm-compiler/Cargo.toml
+      - name: Test native compiler
+        run: cargo test --locked --release --all-targets --all-features --manifest-path native/pd-vm-compiler/Cargo.toml -- --test-threads=1
       - name: Restore
-        working-directory: IronRust
         run: dotnet restore IronRust.sln
       - name: Build
-        working-directory: IronRust
         run: dotnet build IronRust.sln --no-restore --configuration Release
       - name: Tests
-        working-directory: IronRust
         env:
-          PDVM_NATIVE_COMPILER: ${{ github.workspace }}/IronRust/native/pd-vm-compiler/target/release/libpd_vm_compiler.so
+          PDVM_NATIVE_COMPILER: ${{ github.workspace }}/native/pd-vm-compiler/target/release/libpd_vm_compiler.so
         run: dotnet test IronRust.sln --no-build --configuration Release --verbosity normal

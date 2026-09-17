@@ -82,6 +82,16 @@ public static class PdVmClrCompiler
             typeof(int),
             typeof(int));
 
+    private static readonly MethodInfo DispatchCallScriptMethod =
+        GetBaseMethod(
+            "DispatchCallScript",
+            typeof(IPdVmHost),
+            typeof(PdVmHostImport[]),
+            typeof(uint),
+            typeof(byte),
+            typeof(int),
+            typeof(int));
+
     private static readonly MethodInfo CompleteActiveFrameMethod =
         GetBaseMethod("CompleteActiveFrame");
 
@@ -624,6 +634,16 @@ public static class PdVmClrCompiler
                     evaluationStack,
                     stackDepth);
                 return;
+            case PdVmBytecodeOpCode.CallScript:
+                EmitCallScriptInstruction(
+                    il,
+                    importsField,
+                    instruction,
+                    dispatchLabel,
+                    executedInstructionsLocal,
+                    evaluationStack,
+                    stackDepth);
+                return;
             default:
                 throw new PdVmCompilerException($"unsupported opcode {instruction.OpCode}");
         }
@@ -1002,6 +1022,31 @@ public static class PdVmClrCompiler
         EmitInt32(il, instruction.Offset);
         EmitInt32(il, instruction.NextOffset);
         il.Emit(OpCodes.Call, DispatchCallValueMethod);
+        il.Emit(OpCodes.Brfalse, continueDispatch);
+        EmitReturnStatus(il, executedInstructionsLocal, GetLastStatusMethod);
+        il.MarkLabel(continueDispatch);
+        il.Emit(OpCodes.Br, dispatchLabel);
+    }
+
+    private static void EmitCallScriptInstruction(
+        ILGenerator il,
+        FieldBuilder importsField,
+        PdVmInstruction instruction,
+        Label dispatchLabel,
+        LocalBuilder executedInstructionsLocal,
+        IReadOnlyList<LocalBuilder> evaluationStack,
+        int stackDepth)
+    {
+        EmitPersistExecutionState(il, evaluationStack, stackDepth);
+        var continueDispatch = il.DefineLabel();
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Ldarg_1);
+        il.Emit(OpCodes.Ldsfld, importsField);
+        EmitInt32(il, checked((int)instruction.PrototypeId!.Value));
+        EmitInt32(il, instruction.ArgCount!.Value);
+        EmitInt32(il, instruction.Offset);
+        EmitInt32(il, instruction.NextOffset);
+        il.Emit(OpCodes.Call, DispatchCallScriptMethod);
         il.Emit(OpCodes.Brfalse, continueDispatch);
         EmitReturnStatus(il, executedInstructionsLocal, GetLastStatusMethod);
         il.MarkLabel(continueDispatch);

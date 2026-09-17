@@ -64,7 +64,7 @@ public sealed class PdVmCompilerTests
     }
 
     [Fact]
-    public void ReadsV10CallableMetadataAndExportSchema()
+    public void ReadsV13CallableMetadataAndExportSchema()
     {
         var callableSchema = new PdVmTypeSchema(
             PdVmTypeSchemaKind.Callable,
@@ -211,9 +211,10 @@ public sealed class PdVmCompilerTests
     }
 
     [Theory]
-    [InlineData(8)]
-    [InlineData(9)]
-    public void RejectsPreV10PayloadsWithPreciseVersion(int version)
+    [InlineData(10)]
+    [InlineData(11)]
+    [InlineData(12)]
+    public void RejectsPreV13PayloadsWithPreciseVersion(int version)
     {
         var payload = EncodeVmbc(
             Array.Empty<PdVmValue>(),
@@ -224,7 +225,7 @@ public sealed class PdVmCompilerTests
 
         var error = Assert.Throws<PdVmCompilerException>(() => PdVmVmbcReader.ReadBytes(payload));
 
-        Assert.Equal($"unsupported VMBC version {version}, expected 10", error.Message);
+        Assert.Equal($"unsupported VMBC version {version}, expected 13", error.Message);
     }
 
     [Fact]
@@ -815,7 +816,7 @@ public sealed class PdVmCompilerTests
         using var writer = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true);
 
         writer.Write("VMBC"u8.ToArray());
-        writer.Write((ushort)10);
+        writer.Write((ushort)13);
         writer.Write((ushort)0);
         writer.Write((uint)constants.Count);
         foreach (var constant in constants)
@@ -831,6 +832,7 @@ public sealed class PdVmCompilerTests
             WriteString(writer, import.Name);
             writer.Write(import.Arity);
             writer.Write((byte)import.ReturnType);
+            writer.Write((byte)0);
         }
 
         WriteTypeMap(writer, typeMap);
@@ -847,6 +849,7 @@ public sealed class PdVmCompilerTests
         {
             writeCallableMetadata(writer);
         }
+        writer.Write((uint)0);
         writer.Flush();
         return stream.ToArray();
     }

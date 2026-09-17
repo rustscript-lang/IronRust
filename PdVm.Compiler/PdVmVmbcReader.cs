@@ -8,7 +8,7 @@ public static class PdVmVmbcReader
     private const int MaximumConstantDepth = 64;
     private static readonly byte[] Magic = "VMBC"u8.ToArray();
 
-    private const ushort Version = 10;
+    private const ushort Version = 13;
     private const ushort Flags = 0;
 
     public static PdVmProgramModel ReadFile(string path)
@@ -59,17 +59,31 @@ public static class PdVmVmbcReader
 
         var importCount = checked((int)cursor.ReadUInt32());
         var imports = new List<PdVmHostImport>(importCount);
+        var hostImportSchemas = new PdVmHostImportSchema?[importCount];
         for (var index = 0; index < importCount; index++)
         {
             var name = cursor.ReadString();
             var arity = cursor.ReadByte();
             var returnType = ReadValueType(cursor.ReadByte());
             imports.Add(new PdVmHostImport(name, arity, returnType));
+            var schema = ReadOptionalHostImportSchema(ref cursor);
+            if (schema is not null && (schema.Name != name || schema.Params.Count != arity))
+            {
+                throw new PdVmCompilerException(
+                    $"host import schema for '{name}' does not match its import");
+            }
+            if (schema is not null && schema.Fingerprint == 0)
+            {
+                throw new PdVmCompilerException(
+                    $"host import '{name}' is missing a catalog fingerprint");
+            }
+            hostImportSchemas[index] = schema;
         }
 
         var typeMap = ReadTypeMap(ref cursor);
         SkipDebugInfo(ref cursor);
         var callableMetadata = ReadCallableMetadata(ref cursor);
+        var namedStructDecls = ReadNamedStructDecls(ref cursor);
 
         if (!cursor.IsEof)
         {
@@ -90,7 +104,9 @@ public static class PdVmVmbcReader
             callableMetadata.CallablePrototypes,
             callableMetadata.FunctionRegions,
             callableMetadata.RootCallableBindings,
-            callableMetadata.ExportedCallables);
+            callableMetadata.ExportedCallables,
+            hostImportSchemas,
+            namedStructDecls);
     }
 
     private static int InferRootLocalCount(
@@ -241,6 +257,18 @@ public static class PdVmVmbcReader
                     {
                         var argCount = ReadByteOperand(code, ref ip, offset, op, 1);
                         instruction = new PdVmInstruction(offset, op, ip, ArgCount: argCount);
+                        break;
+                    }
+                case PdVmBytecodeOpCode.CallScript:
+                    {
+                        var prototypeId = ReadUInt32Operand(code, ref ip, offset, op, 5);
+                        var argCount = ReadByteOperand(code, ref ip, offset, op, 5);
+                        instruction = new PdVmInstruction(
+                            offset,
+                            op,
+                            ip,
+                            ArgCount: argCount,
+                            PrototypeId: prototypeId);
                         break;
                     }
                 default:
@@ -570,6 +598,139 @@ public static class PdVmVmbcReader
         return new CallableMetadata(scriptFunctions, prototypes, regions, rootBindings, exports);
     }
 
+    private static IReadOnlyList<PdVmNamedStructDecl> ReadNamedStructDecls(ref Cursor cursor)
+    {
+        var count = checked((int)cursor.ReadUInt32());
+        var decls = new List<PdVmNamedStructDecl>(count);
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        for (var index = 0; index < count; index++)
+        {
+            var name = cursor.ReadString();
+            if (!names.Add(name))
+            {
+                throw new PdVmCompilerException($"duplicate named struct declaration '{name}'");
+            }
+
+            var paramCount = checked((int)cursor.ReadUInt32());
+            var typeParams = new string[paramCount];
+            var seenParams = new HashSet<string>(StringComparer.Ordinal);
+            for (var paramIndex = 0; paramIndex < paramCount; paramIndex++)
+            {
+                var param = cursor.ReadString();
+                if (!seenParams.Add(param))
+                {
+                    throw new PdVmCompilerException(
+                        $"duplicate generic parameter '{param}' on named struct '{name}'");
+                }
+
+                typeParams[paramIndex] = param;
+            }
+
+            decls.Add(new PdVmNamedStructDecl(name, typeParams, ReadSchema(ref cursor)));
+        }
+
+        return decls;
+    }
+
+    private static PdVmHostImportSchema? ReadOptionalHostImportSchema(ref Cursor cursor)
+    {
+        return cursor.ReadByte() switch
+        {
+            0 => null,
+            1 => ReadHostImportSchema(ref cursor),
+            var value => throw new PdVmCompilerException($"invalid host import schema flag {value}"),
+        };
+    }
+
+    private static PdVmHostImportSchema ReadHostImportSchema(ref Cursor cursor)
+    {
+        var name = cursor.ReadString();
+        var paramCount = checked((int)cursor.ReadUInt32());
+        var parameters = new PdVmHostImportParam[paramCount];
+        for (var index = 0; index < paramCount; index++)
+        {
+            var paramName = cursor.ReadString();
+            var schema = ReadHostTypeSchema(ref cursor, 0);
+            var passing = cursor.ReadByte() switch
+            {
+                0 => PdVmHostParamPassing.Value,
+                1 => PdVmHostParamPassing.Borrow,
+                2 => PdVmHostParamPassing.BorrowMut,
+                3 => PdVmHostParamPassing.TakeOwned,
+                var value => throw new PdVmCompilerException($"invalid host parameter passing {value}"),
+            };
+            parameters[index] = new PdVmHostImportParam(paramName, schema, passing);
+        }
+
+        var returnType = ReadHostTypeSchema(ref cursor, 0);
+        var fingerprint = cursor.ReadUInt64();
+        return new PdVmHostImportSchema(name, parameters, returnType, fingerprint);
+    }
+
+    private static PdVmHostTypeSchema ReadHostTypeSchema(ref Cursor cursor, int depth)
+    {
+        if (depth >= MaximumConstantDepth)
+        {
+            throw new PdVmCompilerException(
+                $"host schema nesting exceeds {MaximumConstantDepth} levels");
+        }
+
+        return cursor.ReadByte() switch
+        {
+            0 => new PdVmHostTypeSchema(PdVmHostTypeSchemaKind.Unknown),
+            1 => new PdVmHostTypeSchema(PdVmHostTypeSchemaKind.Null),
+            2 => new PdVmHostTypeSchema(PdVmHostTypeSchemaKind.Int),
+            3 => new PdVmHostTypeSchema(PdVmHostTypeSchemaKind.Float),
+            4 => new PdVmHostTypeSchema(PdVmHostTypeSchemaKind.Number),
+            5 => new PdVmHostTypeSchema(PdVmHostTypeSchemaKind.Bool),
+            6 => new PdVmHostTypeSchema(PdVmHostTypeSchemaKind.String),
+            7 => new PdVmHostTypeSchema(PdVmHostTypeSchemaKind.Bytes),
+            8 => new PdVmHostTypeSchema(
+                PdVmHostTypeSchemaKind.Array,
+                element: ReadHostTypeSchema(ref cursor, depth + 1)),
+            9 => new PdVmHostTypeSchema(
+                PdVmHostTypeSchemaKind.Map,
+                element: ReadHostTypeSchema(ref cursor, depth + 1)),
+            10 => new PdVmHostTypeSchema(
+                PdVmHostTypeSchemaKind.Optional,
+                element: ReadHostTypeSchema(ref cursor, depth + 1)),
+            11 => ReadHostCallableSchema(ref cursor, depth),
+            12 => new PdVmHostTypeSchema(PdVmHostTypeSchemaKind.Resource, name: cursor.ReadString()),
+            13 => ReadHostNamedSchema(ref cursor, depth),
+            var tag => throw new PdVmCompilerException($"invalid host schema tag {tag}"),
+        };
+    }
+
+    private static PdVmHostTypeSchema ReadHostCallableSchema(ref Cursor cursor, int depth)
+    {
+        var count = checked((int)cursor.ReadUInt32());
+        var parameters = new PdVmHostTypeSchema[count];
+        for (var index = 0; index < count; index++)
+        {
+            parameters[index] = ReadHostTypeSchema(ref cursor, depth + 1);
+        }
+
+        return new PdVmHostTypeSchema(
+            PdVmHostTypeSchemaKind.Callable,
+            items: parameters,
+            result: ReadHostTypeSchema(ref cursor, depth + 1));
+    }
+
+    private static PdVmHostTypeSchema ReadHostNamedSchema(ref Cursor cursor, int depth)
+    {
+        var name = cursor.ReadString();
+        var count = checked((int)cursor.ReadUInt32());
+        var fields = new PdVmHostStructField[count];
+        for (var index = 0; index < count; index++)
+        {
+            fields[index] = new PdVmHostStructField(
+                cursor.ReadString(),
+                ReadHostTypeSchema(ref cursor, depth + 1));
+        }
+
+        return new PdVmHostTypeSchema(PdVmHostTypeSchemaKind.Named, name: name, fields: fields);
+    }
+
     private static IReadOnlyList<ushort> ReadUInt16List(ref Cursor cursor)
     {
         var count = checked((int)cursor.ReadUInt32());
@@ -682,6 +843,36 @@ public static class PdVmVmbcReader
             if (exported.LocalSlot >= localCount || !exportNames.Add(exported.Name))
             {
                 throw new PdVmCompilerException("exported callable binding is invalid");
+            }
+        }
+
+        foreach (var instruction in instructions)
+        {
+            if (instruction.OpCode != PdVmBytecodeOpCode.CallScript)
+            {
+                continue;
+            }
+
+            if (instruction.PrototypeId is not uint prototypeId ||
+                prototypeId >= metadata.CallablePrototypes.Count)
+            {
+                throw new PdVmCompilerException(
+                    $"callscript at offset {instruction.Offset} references an invalid prototype");
+            }
+
+            var prototype = metadata.CallablePrototypes[(int)prototypeId];
+            if (prototype.Target.Kind != PdVmCallableTargetKind.ScriptFunction ||
+                prototype.CaptureSlots.Count != 0 ||
+                prototype.SelfSlot.HasValue)
+            {
+                throw new PdVmCompilerException(
+                    $"callscript at offset {instruction.Offset} requires an environment-free script prototype");
+            }
+
+            if (prototype.Arity != instruction.ArgCount)
+            {
+                throw new PdVmCompilerException(
+                    $"callscript at offset {instruction.Offset} expects arity {prototype.Arity}, got {instruction.ArgCount}");
             }
         }
 
@@ -864,6 +1055,12 @@ public static class PdVmVmbcReader
         {
             var value = ReadExact(4);
             return BitConverter.ToUInt32(value);
+        }
+
+        public ulong ReadUInt64()
+        {
+            var value = ReadExact(8);
+            return BitConverter.ToUInt64(value);
         }
 
         public long ReadInt64()

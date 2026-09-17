@@ -1,6 +1,8 @@
 use std::path::Path;
 use std::ptr;
 
+use edge::{ABI_VERSION, compile_edge_source_file, function_by_name};
+
 mod vmbc;
 
 const STATUS_OK: i32 = 0;
@@ -8,7 +10,10 @@ const STATUS_COMPILE_ERROR: i32 = 1;
 const STATUS_INVALID_ARGUMENT: i32 = 2;
 const STATUS_PANIC: i32 = 3;
 
+const FROZEN_EDGE_ABI: u16 = 25;
+
 #[unsafe(no_mangle)]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn pdvm_compile_file_utf8(
     path_ptr: *const u8,
     path_len: usize,
@@ -31,11 +36,7 @@ pub extern "C" fn pdvm_compile_file_utf8(
         let path_bytes = unsafe { std::slice::from_raw_parts(path_ptr, path_len) };
         let path_text = std::str::from_utf8(path_bytes)
             .map_err(|error| (STATUS_INVALID_ARGUMENT, error.to_string()))?;
-        let compiled = vm::compile_source_file(Path::new(path_text))
-            .map_err(|error| (STATUS_COMPILE_ERROR, error.to_string()))?;
-        let local_count = compiled.locals;
-        let program = compiled.program.with_local_count(local_count);
-        vmbc::encode_program(&program).map_err(|error| (STATUS_COMPILE_ERROR, error))
+        compile_source_path(Path::new(path_text))
     });
 
     match result {
@@ -64,6 +65,7 @@ pub extern "C" fn pdvm_compile_file_utf8(
 }
 
 #[unsafe(no_mangle)]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn pdvm_free_buffer(buffer_ptr: *mut u8, buffer_len: usize) {
     if buffer_ptr.is_null() {
         return;
@@ -72,6 +74,93 @@ pub extern "C" fn pdvm_free_buffer(buffer_ptr: *mut u8, buffer_len: usize) {
         let slice = ptr::slice_from_raw_parts_mut(buffer_ptr, buffer_len);
         drop(Box::from_raw(slice));
     }
+}
+
+fn compile_source_path(path: &Path) -> Result<Vec<u8>, (i32, String)> {
+    if ABI_VERSION != FROZEN_EDGE_ABI {
+        return Err((
+            STATUS_COMPILE_ERROR,
+            format!("stale pd-edge ABI {ABI_VERSION}, expected {FROZEN_EDGE_ABI}"),
+        ));
+    }
+
+    let compiled = if source_needs_edge_catalog(path) {
+        compile_edge_source_file(path).map_err(|error| (STATUS_COMPILE_ERROR, error.to_string()))?
+    } else {
+        vm::compile_source_file(path).map_err(|error| (STATUS_COMPILE_ERROR, error.to_string()))?
+    };
+    fail_closed_on_stale_catalog(&compiled.program)?;
+    let local_count = compiled.locals;
+    let program = compiled.program.with_local_count(local_count);
+    vmbc::encode_program(&program).map_err(|error| (STATUS_COMPILE_ERROR, error))
+}
+
+fn source_needs_edge_catalog(path: &Path) -> bool {
+    std::fs::read_to_string(path).is_ok_and(|source| {
+        source.contains("http::")
+            || source.contains("proxy::")
+            || source.contains("mqtt::")
+            || source.contains("use http")
+            || source.contains("use proxy")
+            || source.contains("use mqtt")
+    })
+}
+
+fn fail_closed_on_stale_catalog(program: &vm::Program) -> Result<(), (i32, String)> {
+    let schemas = program.host_import_schemas();
+    let schema_count = schemas.len();
+    if schema_count != 0 && schema_count != program.imports.len() {
+        return Err((
+            STATUS_COMPILE_ERROR,
+            format!(
+                "host import schema count {schema_count} does not match import count {}",
+                program.imports.len()
+            ),
+        ));
+    }
+
+    for (index, import) in program.imports.iter().enumerate() {
+        let Some(abi_function) = function_by_name(&import.name) else {
+            continue;
+        };
+        if schema_count == 0 {
+            return Err((
+                STATUS_COMPILE_ERROR,
+                format!(
+                    "catalog import '{}' is missing a typed host schema/fingerprint",
+                    import.name
+                ),
+            ));
+        }
+        let Some(schema) = schemas[index].as_ref() else {
+            return Err((
+                STATUS_COMPILE_ERROR,
+                format!(
+                    "catalog import '{}' is missing a typed host schema/fingerprint",
+                    import.name
+                ),
+            ));
+        };
+        if schema.name != import.name || schema.arity() != import.arity as usize {
+            return Err((
+                STATUS_COMPILE_ERROR,
+                format!(
+                    "catalog import '{}' schema does not match the published ABI contract",
+                    import.name
+                ),
+            ));
+        }
+        if abi_function.name != schema.name || abi_function.arity as usize != schema.arity() {
+            return Err((
+                STATUS_COMPILE_ERROR,
+                format!(
+                    "catalog import '{}' drifted from pd-edge ABI {FROZEN_EDGE_ABI}",
+                    import.name
+                ),
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn write_output(output_ptr: *mut *mut u8, output_len: *mut usize, bytes: Vec<u8>) {
@@ -97,6 +186,15 @@ mod tests {
         assert_eq!(status, STATUS_INVALID_ARGUMENT);
         assert!(!output.is_null());
         pdvm_free_buffer(output, length);
+    }
+
+    #[test]
+    fn frozen_edge_abi_is_version_25() {
+        assert_eq!(ABI_VERSION, FROZEN_EDGE_ABI);
+        assert!(
+            edge::abi_json().contains("\"abi_version\": 25"),
+            "published edge ABI JSON must record version 25"
+        );
     }
 
     #[test]

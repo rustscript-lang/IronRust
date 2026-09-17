@@ -563,7 +563,7 @@ public static class PdVmBuiltins
                 or PdVmBuiltin.MapIterClose
                 or PdVmBuiltin.BindCallable
                 or PdVmBuiltin.DetachLocal => throw new NotSupportedException(
-                    $"builtin {builtin} requires the VMBC v10 callable runtime"),
+                    $"builtin {builtin} requires the VMBC v13 callable runtime"),
             PdVmBuiltin.JitSetConfig
                 or PdVmBuiltin.JitGetConfig
                 or PdVmBuiltin.JitSetEnabled
