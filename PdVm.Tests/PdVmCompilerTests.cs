@@ -210,6 +210,325 @@ public sealed class PdVmCompilerTests
             Assert.Single(artifact.Program.Stack).AsArray().Select(value => value.AsInt()));
     }
 
+    [Fact]
+    public void SetNullDeletesMapEntryAndLeavesSiblingKeys()
+    {
+        var drop = PdVmValue.FromString("drop");
+        var keep = PdVmValue.FromString("keep");
+        var missing = PdVmValue.FromString("missing");
+        var code = new BytecodeBuilder()
+            .EmitLdc(0)
+            .EmitLdc(1)
+            .EmitLdc(2)
+            .EmitCall(PdVmBuiltins.GetCallIndex(PdVmBuiltin.Set), 3)
+            .Emit(PdVmBytecodeOpCode.Ret)
+            .Build();
+        var program = CompileProgram(
+            [
+                PdVmValue.FromMap(
+                [
+                    new KeyValuePair<PdVmValue, PdVmValue>(drop, PdVmValue.FromInt(1)),
+                    new KeyValuePair<PdVmValue, PdVmValue>(keep, PdVmValue.FromInt(2)),
+                ]),
+                drop,
+                PdVmValue.Null(),
+            ],
+            code);
+
+        var result = PdVmExecution.Run(program, new PdVmDelegateHost());
+
+        Assert.Equal(PdVmStatusKind.Halted, result.Status.Kind);
+        var map = Assert.Single(program.Stack).AsMap();
+        Assert.Equal(1, map.Count);
+        Assert.False(map.TryGetValue(drop, out _));
+        Assert.True(map.TryGetValue(keep, out var kept));
+        Assert.Equal(2, kept.AsInt());
+        Assert.False(map.TryGetValue(missing, out _));
+    }
+
+    [Fact]
+    public void SetNullOnMissingMapKeyIsANoOpDelete()
+    {
+        var keep = PdVmValue.FromString("keep");
+        var missing = PdVmValue.FromString("missing");
+        var code = new BytecodeBuilder()
+            .EmitLdc(0)
+            .EmitLdc(1)
+            .EmitLdc(2)
+            .EmitCall(PdVmBuiltins.GetCallIndex(PdVmBuiltin.Set), 3)
+            .Emit(PdVmBytecodeOpCode.Ret)
+            .Build();
+        var program = CompileProgram(
+            [
+                PdVmValue.FromMap(
+                [
+                    new KeyValuePair<PdVmValue, PdVmValue>(keep, PdVmValue.FromInt(2)),
+                ]),
+                missing,
+                PdVmValue.Null(),
+            ],
+            code);
+
+        var result = PdVmExecution.Run(program, new PdVmDelegateHost());
+
+        Assert.Equal(PdVmStatusKind.Halted, result.Status.Kind);
+        var map = Assert.Single(program.Stack).AsMap();
+        Assert.Equal(1, map.Count);
+        Assert.True(map.TryGetValue(keep, out var kept));
+        Assert.Equal(2, kept.AsInt());
+        Assert.False(map.TryGetValue(missing, out _));
+    }
+
+    [Fact]
+    public void CopyableMoveFieldGetLeavesMapEntry()
+    {
+        var key = PdVmValue.FromString("a");
+        var code = new BytecodeBuilder()
+            .EmitLdc(0)
+            .EmitStloc(0)
+            .EmitLdloc(0)
+            .EmitLdc(1)
+            .EmitCall(PdVmBuiltins.GetCallIndex(PdVmBuiltin.Get), 2)
+            .EmitStloc(1)
+            .EmitLdloc(0)
+            .EmitLdc(1)
+            .EmitCall(PdVmBuiltins.GetCallIndex(PdVmBuiltin.Get), 2)
+            .EmitStloc(2)
+            .EmitLdloc(0)
+            .Emit(PdVmBytecodeOpCode.Ret)
+            .Build();
+        var program = CompileProgram(
+            [
+                PdVmValue.FromMap(
+                [
+                    new KeyValuePair<PdVmValue, PdVmValue>(key, PdVmValue.FromInt(1)),
+                ]),
+                key,
+            ],
+            code);
+
+        var result = PdVmExecution.Run(program, new PdVmDelegateHost());
+
+        Assert.Equal(PdVmStatusKind.Halted, result.Status.Kind);
+        var map = Assert.Single(program.Stack).AsMap();
+        Assert.True(map.TryGetValue(key, out var remaining));
+        Assert.Equal(1, remaining.AsInt());
+        Assert.Equal(1, program.Locals[1].AsInt());
+        Assert.Equal(1, program.Locals[2].AsInt());
+    }
+
+    [Fact]
+    public void CopyableMoveFieldGetThenSetNullLeavesMapEntry()
+    {
+        var key = PdVmValue.FromString("a");
+        var code = new BytecodeBuilder()
+            .EmitLdc(0)
+            .EmitStloc(0)
+            .EmitLdloc(0)
+            .EmitLdc(1)
+            .EmitCall(PdVmBuiltins.GetCallIndex(PdVmBuiltin.Get), 2)
+            .EmitLdloc(0)
+            .EmitLdc(1)
+            .EmitLdc(2)
+            .EmitCall(PdVmBuiltins.GetCallIndex(PdVmBuiltin.Set), 3)
+            .EmitStloc(0)
+            .EmitStloc(1)
+            .EmitLdloc(0)
+            .Emit(PdVmBytecodeOpCode.Ret)
+            .Build();
+        var program = CompileProgram(
+            [
+                PdVmValue.FromMap(
+                [
+                    new KeyValuePair<PdVmValue, PdVmValue>(key, PdVmValue.FromInt(1)),
+                ]),
+                key,
+                PdVmValue.Null(),
+            ],
+            code);
+
+        var result = PdVmExecution.Run(program, new PdVmDelegateHost());
+
+        Assert.Equal(PdVmStatusKind.Halted, result.Status.Kind);
+        Assert.Equal(1, program.Locals[1].AsInt());
+        var map = Assert.Single(program.Stack).AsMap();
+        Assert.True(map.TryGetValue(key, out var remaining));
+        Assert.Equal(1, remaining.AsInt());
+    }
+
+    [Fact]
+    public void ResourceMoveFieldGetThenSetNullVacatesMapEntryOnce()
+    {
+        var key = PdVmValue.FromString("a");
+        var sibling = PdVmValue.FromString("b");
+        var code = new BytecodeBuilder()
+            .EmitLdc(0)
+            .EmitStloc(0)
+            .EmitLdloc(0)
+            .EmitLdc(1)
+            .EmitCall(PdVmBuiltins.GetCallIndex(PdVmBuiltin.Get), 2)
+            .EmitLdloc(0)
+            .EmitLdc(1)
+            .EmitLdc(2)
+            .EmitCall(PdVmBuiltins.GetCallIndex(PdVmBuiltin.Set), 3)
+            .EmitStloc(0)
+            .EmitStloc(1)
+            .EmitLdloc(0)
+            .Emit(PdVmBytecodeOpCode.Ret)
+            .Build();
+        var program = CompileProgram(
+            [
+                PdVmValue.FromMap(
+                [
+                    new KeyValuePair<PdVmValue, PdVmValue>(key, PdVmValue.FromString("owned")),
+                    new KeyValuePair<PdVmValue, PdVmValue>(sibling, PdVmValue.FromInt(1)),
+                ]),
+                key,
+                PdVmValue.Null(),
+            ],
+            code);
+
+        var result = PdVmExecution.Run(program, new PdVmDelegateHost());
+
+        Assert.Equal(PdVmStatusKind.Halted, result.Status.Kind);
+        Assert.Equal("owned", program.Locals[1].AsString());
+        var map = Assert.Single(program.Stack).AsMap();
+        Assert.Equal(1, map.Count);
+        Assert.False(map.TryGetValue(key, out _));
+        Assert.True(map.TryGetValue(sibling, out var kept));
+        Assert.Equal(1, kept.AsInt());
+    }
+
+    [Fact]
+    public void GetMissingMapKeyReportsMapKeyNotFound()
+    {
+        var code = new BytecodeBuilder()
+            .EmitLdc(0)
+            .EmitLdc(1)
+            .EmitCall(PdVmBuiltins.GetCallIndex(PdVmBuiltin.Get), 2)
+            .Emit(PdVmBytecodeOpCode.Ret)
+            .Build();
+        var program = CompileProgram(
+            [
+                PdVmValue.FromMap(
+                [
+                    new KeyValuePair<PdVmValue, PdVmValue>(
+                        PdVmValue.FromString("keep"),
+                        PdVmValue.FromInt(1)),
+                ]),
+                PdVmValue.FromString("missing"),
+            ],
+            code);
+
+        var error = Assert.Throws<InvalidOperationException>(
+            () => PdVmExecution.Run(program, new PdVmDelegateHost()));
+
+        Assert.Equal("map key not found", error.Message);
+    }
+
+    [Fact]
+    public void MoveCaptureWritebackVacatesOwnedMapField()
+    {
+        var key = PdVmValue.FromString("a");
+        var builder = new BytecodeBuilder()
+            .EmitLdc(0)
+            .EmitStloc(0)
+            .EmitLdc(1)
+            .EmitCall(PdVmBuiltins.GetCallIndex(PdVmBuiltin.ArrayNew), 0)
+            .EmitLdloc(0)
+            .EmitCall(PdVmBuiltins.GetCallIndex(PdVmBuiltin.ArrayPush), 2)
+            .EmitCall(PdVmBuiltins.GetCallIndex(PdVmBuiltin.BindCallable), 2)
+            .EmitStloc(1)
+            .EmitLdc(2)
+            .EmitCall(PdVmBuiltins.GetCallIndex(PdVmBuiltin.DetachLocal), 1)
+            .EmitLdloc(1)
+            .EmitCallValue(0)
+            .Emit(PdVmBytecodeOpCode.Ret);
+        var rootEnd = builder.Position;
+        builder
+            .EmitLdloc(2)
+            .EmitLdc(3)
+            .EmitCall(PdVmBuiltins.GetCallIndex(PdVmBuiltin.Get), 2)
+            .EmitStloc(3)
+            .EmitLdloc(2)
+            .EmitLdc(3)
+            .EmitLdc(4)
+            .EmitCall(PdVmBuiltins.GetCallIndex(PdVmBuiltin.Set), 3)
+            .EmitStloc(2)
+            .EmitCall(PdVmBuiltins.GetCallIndex(PdVmBuiltin.ArrayNew), 0)
+            .EmitLdloc(3)
+            .EmitCall(PdVmBuiltins.GetCallIndex(PdVmBuiltin.ArrayPush), 2)
+            .EmitLdloc(2)
+            .EmitLdc(3)
+            .EmitCall(PdVmBuiltins.GetCallIndex(PdVmBuiltin.Has), 2)
+            .EmitCall(PdVmBuiltins.GetCallIndex(PdVmBuiltin.ArrayPush), 2)
+            .Emit(PdVmBytecodeOpCode.Ret);
+        var functionEnd = builder.Position;
+        var typeMap = new PdVmTypeMap(
+            [PdVmValueType.Map, PdVmValueType.Callable, PdVmValueType.Map, PdVmValueType.String],
+            new Dictionary<int, PdVmOperandTypes>(),
+            [null, null, null, null],
+            [false, true, false, false],
+            [false, false, false, false],
+            strictTypes: true);
+        var artifact = CompileProgramArtifact(
+            [
+                PdVmValue.FromMap(
+                [
+                    new KeyValuePair<PdVmValue, PdVmValue>(key, PdVmValue.FromString("owned")),
+                    new KeyValuePair<PdVmValue, PdVmValue>(PdVmValue.FromString("b"), PdVmValue.FromInt(1)),
+                ]),
+                PdVmValue.FromInt(0),
+                PdVmValue.FromInt(0),
+                key,
+                PdVmValue.Null(),
+            ],
+            builder.Build(),
+            typeMap: typeMap,
+            writeCallableMetadata: writer =>
+            {
+                writer.Write((uint)1); // script functions
+                writer.Write((uint)rootEnd);
+                writer.Write((uint)functionEnd);
+
+                writer.Write((uint)1); // callable prototypes
+                writer.Write((byte)PdVmCallableKind.Closure);
+                writer.Write((byte)PdVmCallableTargetKind.ScriptFunction);
+                writer.Write((uint)0);
+                writer.Write((byte)0);
+                writer.Write((uint)4);
+                writer.Write((uint)0); // parameters
+                writer.Write((uint)1); // capture sources
+                writer.Write((ushort)0);
+                writer.Write((uint)1); // capture targets
+                writer.Write((ushort)2);
+                writer.Write((uint)1); // capture modes
+                writer.Write((byte)PdVmCaptureBindingMode.Move);
+                writer.Write((byte)0); // self slot
+                writer.Write((byte)0); // schema
+
+                writer.Write((uint)2); // function regions
+                writer.Write((uint)0);
+                writer.Write((uint)rootEnd);
+                writer.Write((byte)0);
+                writer.Write((uint)rootEnd);
+                writer.Write((uint)functionEnd);
+                writer.Write((byte)1);
+                writer.Write((uint)0);
+
+                writer.Write((uint)0); // root callable bindings
+                writer.Write((uint)0); // exported callables
+            });
+
+        var result = PdVmExecution.Run(artifact.Program, new PdVmDelegateHost());
+
+        Assert.Equal(PdVmStatusKind.Halted, result.Status.Kind);
+        Assert.Equal(PdVmValueKind.Null, artifact.Program.Locals[0].Kind);
+        var returned = Assert.Single(artifact.Program.Stack).AsArray();
+        Assert.Equal("owned", returned[0].AsString());
+        Assert.False(returned[1].AsBool());
+    }
+
     [Theory]
     [InlineData(10)]
     [InlineData(11)]

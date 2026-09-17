@@ -139,6 +139,21 @@ public static class PdVmBuiltins
     public static PdVmValue SetValue(PdVmValue container, PdVmValue key, PdVmValue value) =>
         DispatchSet(new[] { container, key, value });
 
+    public static PdVmValue VacateMovedField(PdVmValue container, PdVmValue key, PdVmValue movedValue)
+    {
+        // ABI 25 lowers MoveField to Get + set-null. Copyable scalars must stay
+        // in the map; resource values transfer once and the field is removed.
+        if (IsCopyableScalar(movedValue))
+        {
+            return container;
+        }
+
+        return SetValue(container, key, PdVmValue.Null());
+    }
+
+    private static bool IsCopyableScalar(PdVmValue value) =>
+        value.Kind is PdVmValueKind.Int or PdVmValueKind.Float or PdVmValueKind.Bool;
+
     public static PdVmValue KeysValue(PdVmValue container) => DispatchKeys(new[] { container });
 
     public static PdVmValue CountValue(PdVmValue container) => DispatchCount(new[] { container });
@@ -945,7 +960,12 @@ public static class PdVmBuiltins
     private static PdVmValue SetMapValue(PdVmMap map, PdVmValue key, PdVmValue value)
     {
         var output = map.CloneMap();
-        if (value.Kind != PdVmValueKind.Null)
+        // Frozen core builtin_set_map removes the key when value is null.
+        if (value.Kind == PdVmValueKind.Null)
+        {
+            output.Remove(key);
+        }
+        else
         {
             output.Set(key, value);
         }
