@@ -8,7 +8,7 @@ use edge::{ABI_VERSION, compile_edge_source_file, function_by_name, host_namespa
 
 const FROZEN_CORE_REV: &str = "b1d6cffede77f49410bf63525f30b9a46b02dc01";
 const FROZEN_CORE_URL: &str = "https://github.com/rustscript-lang/rustscript.git";
-const FROZEN_EDGE_REV: &str = "6320847098530ab78b0d3cd438b714e699caa8db";
+const FROZEN_EDGE_REV: &str = "5f4f889e349bdfbd5534deb42bd13b616a6114f5";
 const FROZEN_EDGE_URL: &str = "https://github.com/rustscript-lang/pd-edge.git";
 const FROZEN_EDGE_ABI: u16 = 25;
 const EXPECTED_EXAMPLES: usize = 7;
@@ -106,11 +106,20 @@ fn rustscript_and_pd_edge_are_pinned_to_the_frozen_full_shas() {
         "production crates must not use path pins"
     );
     assert!(
+        !cargo_toml.contains("branch =") && !cargo_toml.contains("tag ="),
+        "production crates must not use branch or tag pins"
+    );
+    assert!(
         !cargo_toml.contains("/home/") && !cargo_toml.contains("/mnt/"),
         "production crates must not use machine-specific paths"
     );
     assert_eq!(FROZEN_CORE_REV.len(), 40);
     assert_eq!(FROZEN_EDGE_REV.len(), 40);
+    assert!(
+        FROZEN_CORE_REV.chars().all(|ch| ch.is_ascii_hexdigit())
+            && FROZEN_EDGE_REV.chars().all(|ch| ch.is_ascii_hexdigit()),
+        "frozen pins must be full 40-character SHAs"
+    );
 }
 
 #[test]
@@ -143,13 +152,13 @@ fn the_lockfile_proves_frozen_core_and_edge_sources() {
         }
     }
 
-    for package in ["pd-vm", "pd-host-function"] {
+    for package in ["pd-vm", "pd-host-function", "pd-host-schema"] {
         assert!(
             proven_core.contains(package),
             "Cargo.lock must prove {package} at {expected_core}; core={proven_core:?}"
         );
     }
-    for package in ["pd-edge", "pd-edge-abi"] {
+    for package in ["pd-edge", "pd-edge-abi", "pd-edge-host-function"] {
         assert!(
             proven_edge.contains(package),
             "Cargo.lock must prove {package} at {expected_edge}; edge={proven_edge:?}"
@@ -160,35 +169,160 @@ fn the_lockfile_proves_frozen_core_and_edge_sources() {
 #[test]
 fn every_locked_core_and_edge_revision_is_the_frozen_one() {
     let lock = read(&manifest_dir().join("Cargo.lock"));
-    let sources = lock
-        .lines()
-        .filter_map(|line| line.trim().strip_prefix("source = \"git+"))
-        .collect::<BTreeSet<_>>();
+    let packages = parse_lock_packages(&lock);
     assert!(
-        !sources.is_empty(),
-        "the lockfile must resolve at least one git dependency"
+        packages.iter().any(|package| package.source.is_some()),
+        "the lockfile must resolve at least one sourced dependency"
     );
 
     let mut saw_core = false;
     let mut saw_edge = false;
-    for source in sources {
+    for package in &packages {
+        if !is_pd_family(&package.name) {
+            continue;
+        }
+        if package.name == "pd-vm-compiler" {
+            assert!(
+                package.source.is_none(),
+                "pd-vm-compiler must stay the local crate without a source"
+            );
+            continue;
+        }
+
+        let source = package.source.as_deref().unwrap_or("");
+        assert!(
+            !source.starts_with("registry+"),
+            "{} {} must not resolve from crates.io: {source}",
+            package.name,
+            package.version
+        );
+        assert!(
+            !source.starts_with("path+") && !source.contains("path="),
+            "{} must not use a path pin: {source}",
+            package.name
+        );
+        assert!(
+            !source.contains("branch=") && !source.contains("tag="),
+            "{} must not use a branch or tag pin: {source}",
+            package.name
+        );
+        assert!(
+            source.starts_with("git+"),
+            "{} must lock a git source, got {source}",
+            package.name
+        );
+
+        let rev = git_source_rev(source).unwrap_or("");
+        assert!(
+            rev.len() == 40 && rev.chars().all(|ch| ch.is_ascii_hexdigit()),
+            "{} has a non-full SHA pin: {source}",
+            package.name
+        );
+
         if source.contains("rustscript.git") || source.contains("rustscript?") {
             saw_core = true;
+            assert_eq!(
+                rev, FROZEN_CORE_REV,
+                "a stale core revision is locked for {}: {source}",
+                package.name
+            );
             assert!(
                 source.contains(&format!("rev={FROZEN_CORE_REV}#{FROZEN_CORE_REV}")),
-                "a stale core revision is locked: {source}"
+                "core source must use the full rev#sha form: {source}"
             );
-        }
-        if source.contains("pd-edge.git") || source.contains("pd-edge?") {
+        } else if source.contains("pd-edge.git") || source.contains("pd-edge?") {
             saw_edge = true;
+            assert_eq!(
+                rev, FROZEN_EDGE_REV,
+                "a stale edge revision is locked for {}: {source}",
+                package.name
+            );
             assert!(
                 source.contains(&format!("rev={FROZEN_EDGE_REV}#{FROZEN_EDGE_REV}")),
-                "a stale edge revision is locked: {source}"
+                "edge source must use the full rev#sha form: {source}"
+            );
+        } else {
+            panic!(
+                "{} must come from frozen rustscript or pd-edge, got {source}",
+                package.name
             );
         }
     }
     assert!(saw_core, "Cargo.lock must lock the frozen rustscript core");
     assert!(saw_edge, "Cargo.lock must lock the migrated pd-edge");
+}
+
+struct LockedPackage {
+    name: String,
+    version: String,
+    source: Option<String>,
+}
+
+fn parse_lock_packages(lock: &str) -> Vec<LockedPackage> {
+    let mut packages = Vec::new();
+    let mut name = None;
+    let mut version = None;
+    let mut source = None;
+
+    let flush = |packages: &mut Vec<LockedPackage>,
+                 name: &mut Option<String>,
+                 version: &mut Option<String>,
+                 source: &mut Option<String>| {
+        if let Some(name) = name.take() {
+            packages.push(LockedPackage {
+                name,
+                version: version.take().unwrap_or_default(),
+                source: source.take(),
+            });
+        } else {
+            version.take();
+            source.take();
+        }
+    };
+
+    for line in lock.lines() {
+        let line = line.trim();
+        if line == "[[package]]" {
+            flush(&mut packages, &mut name, &mut version, &mut source);
+            continue;
+        }
+        if line.starts_with('[') {
+            flush(&mut packages, &mut name, &mut version, &mut source);
+            continue;
+        }
+        if let Some(value) = line
+            .strip_prefix("name = \"")
+            .and_then(|rest| rest.strip_suffix('"'))
+        {
+            name = Some(value.to_string());
+        } else if let Some(value) = line
+            .strip_prefix("version = \"")
+            .and_then(|rest| rest.strip_suffix('"'))
+        {
+            version = Some(value.to_string());
+        } else if let Some(value) = line
+            .strip_prefix("source = \"")
+            .and_then(|rest| rest.strip_suffix('"'))
+        {
+            source = Some(value.to_string());
+        }
+    }
+    flush(&mut packages, &mut name, &mut version, &mut source);
+    packages
+}
+
+fn is_pd_family(name: &str) -> bool {
+    name == "pd-vm"
+        || name == "pd-vm-compiler"
+        || name.starts_with("pd-vm-")
+        || name == "pd-edge"
+        || name.starts_with("pd-edge")
+        || name.starts_with("pd-host-")
+}
+
+fn git_source_rev(source: &str) -> Option<&str> {
+    let after_rev = source.split("rev=").nth(1)?;
+    after_rev.split(['#', '&']).next()
 }
 
 #[test]
