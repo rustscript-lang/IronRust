@@ -38,7 +38,9 @@ public sealed class PdVmAbi25ExampleMatrixTests
                 compiled++;
                 if (name == "dotnet-typed-console.rss")
                 {
-                    var result = PdVmExecution.Run(program, PdVmDefaultHost.CreateConsoleHost());
+                    var host = PdVmDefaultHost.CreateConsoleHost();
+                    host.RegisterFallback(new PdVmDotNetHost().Call);
+                    var result = PdVmExecution.Run(program, host);
                     Assert.Equal(PdVmStatusKind.Halted, result.Status.Kind);
                     executed++;
                 }

@@ -875,7 +875,8 @@ public abstract class PdVmProgramBase : IPdVmCallableProgram
                 if (prototype.SelfSlot != slot)
                 {
                     _captureCells[absolute] = cell;
-                    if (prototype.CaptureModes[index] == PdVmRuntimeCaptureBindingMode.BorrowMut)
+                    if (prototype.CaptureModes[index] is PdVmRuntimeCaptureBindingMode.BorrowMut
+                        or PdVmRuntimeCaptureBindingMode.Move)
                     {
                         _mutableBorrowCells.Add(cell);
                     }

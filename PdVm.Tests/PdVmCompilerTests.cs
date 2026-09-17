@@ -274,10 +274,14 @@ public sealed class PdVmCompilerTests
             Assert.InRange(PdVmBuiltins.GetArity(builtin), (byte)0, (byte)3);
         }
 
-        Assert.Equal(0xFFA3, PdVmBuiltins.BuiltinCallBase);
-        Assert.Equal(89, PdVmBuiltins.BuiltinCallCount);
-        Assert.Equal(0xFF95, PdVmBuiltins.GetCallIndex(PdVmBuiltin.BindCallable));
-        Assert.Equal(0xFF94, PdVmBuiltins.GetCallIndex(PdVmBuiltin.DetachLocal));
+        Assert.Equal(0xFFA2, PdVmBuiltins.BuiltinCallBase);
+        Assert.Equal(90, PdVmBuiltins.BuiltinCallCount);
+        Assert.Equal(0xFFA2, PdVmBuiltins.GetCallIndex(PdVmBuiltin.Len));
+        Assert.Equal(0xFFC3, PdVmBuiltins.GetCallIndex(PdVmBuiltin.SqliteOpen));
+        Assert.Equal(0xFFC4, PdVmBuiltins.GetCallIndex(PdVmBuiltin.JsonDecode));
+        Assert.Equal(0xFFFB, PdVmBuiltins.GetCallIndex(PdVmBuiltin.Count));
+        Assert.Equal(0xFF94, PdVmBuiltins.GetCallIndex(PdVmBuiltin.BindCallable));
+        Assert.Equal(0xFF93, PdVmBuiltins.GetCallIndex(PdVmBuiltin.DetachLocal));
     }
 
     [Fact]

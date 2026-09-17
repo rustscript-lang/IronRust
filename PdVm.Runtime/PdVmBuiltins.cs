@@ -39,6 +39,7 @@ public enum PdVmBuiltin
     ReSplit,
     ReCaptures,
     JsonEncode,
+    SqliteOpen,
     JsonDecode,
     JitSetConfig,
     JitGetConfig,
@@ -114,8 +115,8 @@ public enum PdVmBuiltin
 
 public static class PdVmBuiltins
 {
-    public const ushort BuiltinCallBase = 0xFFA3;
-    public const ushort BuiltinCallCount = 89;
+    public const ushort BuiltinCallBase = 0xFFA2;
+    public const ushort BuiltinCallCount = 90;
 
     public static PdVmValue LenValue(PdVmValue value) => DispatchLen(new[] { value });
 
@@ -352,6 +353,7 @@ public static class PdVmBuiltins
                 or PdVmBuiltin.IoClose
                 or PdVmBuiltin.IoExists
                 or PdVmBuiltin.JsonEncode
+                or PdVmBuiltin.SqliteOpen
                 or PdVmBuiltin.JsonDecode
                 or PdVmBuiltin.JitSetEnabled
                 or PdVmBuiltin.JitSetHotLoopThreshold
@@ -543,6 +545,8 @@ public static class PdVmBuiltins
             PdVmBuiltin.ReSplit => ReturnOne(DispatchRegexSplit(args)),
             PdVmBuiltin.ReCaptures => ReturnOne(DispatchRegexCaptures(args)),
             PdVmBuiltin.JsonEncode => ReturnOne(DispatchJsonEncode(args)),
+            PdVmBuiltin.SqliteOpen => throw new NotSupportedException(
+                "builtin SqliteOpen is not implemented"),
             PdVmBuiltin.JsonDecode => ReturnOne(DispatchJsonDecode(args)),
             PdVmBuiltin.Count => ReturnOne(CountValue(GetArg(args, 0))),
             PdVmBuiltin.FormatTemplate => ReturnOne(FormatTemplateValue(GetArg(args, 0), GetArg(args, 1))),
@@ -941,11 +945,7 @@ public static class PdVmBuiltins
     private static PdVmValue SetMapValue(PdVmMap map, PdVmValue key, PdVmValue value)
     {
         var output = map.CloneMap();
-        if (value.Kind == PdVmValueKind.Null)
-        {
-            output.Remove(key);
-        }
-        else
+        if (value.Kind != PdVmValueKind.Null)
         {
             output.Set(key, value);
         }
