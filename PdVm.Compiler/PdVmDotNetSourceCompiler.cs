@@ -932,7 +932,9 @@ public static class PdVmDotNetSourceCompiler
             model.CallablePrototypes,
             model.FunctionRegions,
             model.RootCallableBindings,
-            model.ExportedCallables);
+            model.ExportedCallables,
+            model.HostImportSchemas,
+            model.NamedStructDecls);
     }
 
     private static void CopySourceOverlay(string sourceRoot, string destinationRoot)

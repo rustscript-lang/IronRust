@@ -6,7 +6,8 @@ license = "MIT"
 publish = false
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-vm = { package = "pd-vm", git = "https://github.com/rustscript-lang/rustscript", rev = "b3b481ef9ce72d07763ae6911746ae0c06b19228", default-features = false, features = ["runtime", "edge-abi"] }
+edge = { package = "pd-edge", git = "https://github.com/rustscript-lang/pd-edge.git", rev = "5f4f889e349bdfbd5534deb42bd13b616a6114f5" }
+vm = { package = "pd-vm", git = "https://github.com/rustscript-lang/rustscript.git", rev = "b1d6cffede77f49410bf63525f30b9a46b02dc01", default-features = false, features = ["runtime"] }

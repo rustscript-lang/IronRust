@@ -117,6 +117,8 @@ internal static class PdVmStackAnalyzer
                 $"{instruction.OpCode}({instruction.JumpTarget})",
             PdVmBytecodeOpCode.Call => FormatCall(program, instruction),
             PdVmBytecodeOpCode.CallValue => $"CallValue(argc={instruction.ArgCount})",
+            PdVmBytecodeOpCode.CallScript =>
+                $"CallScript(prototype={instruction.PrototypeId}, argc={instruction.ArgCount})",
             _ => instruction.OpCode.ToString(),
         };
 
@@ -170,6 +172,7 @@ internal static class PdVmStackAnalyzer
             PdVmBytecodeOpCode.Dup => (1, 2),
             PdVmBytecodeOpCode.Call => GetCallStackEffect(program, instruction),
             PdVmBytecodeOpCode.CallValue => (checked(instruction.ArgCount!.Value + 1), 1),
+            PdVmBytecodeOpCode.CallScript => (instruction.ArgCount!.Value, 1),
             _ => throw new PdVmCompilerException($"unsupported opcode {instruction.OpCode}"),
         };
 

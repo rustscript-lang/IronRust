@@ -537,6 +537,79 @@ public sealed class PdVmTypedDotNetInteropTests
     }
 
     [Fact]
+    public void ExplicitSetNullDeletesMapEntryThroughGeneratedClr()
+    {
+        using var fixture = new SourceFixture(
+            "let mut values = { key: 1, drop: 2 };\n" +
+            "values[\"drop\"] = null;\n" +
+            "[values.has(\"drop\"), values.has(\"key\"), values.key];\n");
+        var output = PdVmDotNetSourceCompiler.CompileFile(fixture.SourcePath, fixture.OutputPath);
+        var program = PdVmAssemblyLoader.CreateProgram(Assembly.Load(File.ReadAllBytes(output)));
+
+        var result = PdVmExecution.Run(program, PdVmDefaultHost.CreateConsoleHost());
+
+        Assert.Equal(PdVmStatusKind.Halted, result.Status.Kind);
+        Assert.Equal(
+            [0L, 1L, 1L],
+            Assert.Single(program.Stack).AsArray().Select(value => value.Kind == PdVmValueKind.Bool
+                ? (value.AsBool() ? 1L : 0L)
+                : value.AsInt()));
+    }
+
+    [Fact]
+    public void CopyableMoveFieldRemainsInMapThroughGeneratedClr()
+    {
+        using var fixture = new SourceFixture(
+            "let p = { a: 1, b: 2 };\n" +
+            "let first = p.a;\n" +
+            "[first, p.has(\"a\"), p.a, p.b];\n");
+        var output = PdVmDotNetSourceCompiler.CompileFile(fixture.SourcePath, fixture.OutputPath);
+        var program = PdVmAssemblyLoader.CreateProgram(Assembly.Load(File.ReadAllBytes(output)));
+
+        var result = PdVmExecution.Run(program, PdVmDefaultHost.CreateConsoleHost());
+
+        Assert.Equal(PdVmStatusKind.Halted, result.Status.Kind);
+        var values = Assert.Single(program.Stack).AsArray();
+        Assert.Equal(1, values[0].AsInt());
+        Assert.True(values[1].AsBool());
+        Assert.Equal(1, values[2].AsInt());
+        Assert.Equal(2, values[3].AsInt());
+    }
+
+    [Fact]
+    public void OwnedMoveFieldVacatesMapEntryThroughGeneratedClr()
+    {
+        using var fixture = new SourceFixture(
+            "let p = { a: \"owned\", b: 1 };\n" +
+            "let first = p.a;\n" +
+            "[first, p.b];\n");
+        var output = PdVmDotNetSourceCompiler.CompileFile(fixture.SourcePath, fixture.OutputPath);
+        var program = PdVmAssemblyLoader.CreateProgram(Assembly.Load(File.ReadAllBytes(output)));
+
+        var result = PdVmExecution.Run(program, PdVmDefaultHost.CreateConsoleHost());
+
+        Assert.Equal(PdVmStatusKind.Halted, result.Status.Kind);
+        var values = Assert.Single(program.Stack).AsArray();
+        Assert.Equal("owned", values[0].AsString());
+        Assert.Equal(1, values[1].AsInt());
+    }
+
+    [Fact]
+    public void OwnedMoveFieldSecondAccessIsRejectedByNativeCompiler()
+    {
+        using var fixture = new SourceFixture(
+            "let p = { a: \"owned\" };\n" +
+            "let first = p.a;\n" +
+            "let second = p.a;\n" +
+            "first;\n");
+
+        var error = Assert.Throws<PdVmCompilerException>(() =>
+            PdVmDotNetSourceCompiler.CompileFile(fixture.SourcePath, fixture.OutputPath));
+
+        Assert.Contains("moved", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task PendingHostCallInsideCallableResumesOnceAndResetCancelsIt()
     {
         using var fixture = new SourceFixture(

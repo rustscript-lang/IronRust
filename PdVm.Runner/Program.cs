@@ -162,7 +162,7 @@ internal static class ProgramEntry
         {
             var callableProgram = program as IPdVmCallableProgram ??
                 throw new InvalidOperationException(
-                    "the Windows Forms profile requires a callable VMBC v10 program");
+                    "the Windows Forms profile requires a callable VMBC v13 program");
             callableProgram.CallbackErrorObserver = exception => Console.Error.WriteLine(exception);
             using var application = PdVmWinFormsApplication.Attach(callableProgram, host);
             var winFormsResult = PdVmExecution.Run(program, host, maxSteps);

@@ -514,7 +514,7 @@ public abstract class PdVmProgramBase : IPdVmCallableProgram
 
         if (prototype.TargetKind == PdVmRuntimeCallableTargetKind.ScriptFunction)
         {
-            EnterScriptCallable(callable, prototype, args, operandBase, nextIp);
+            EnterScriptFrame(callable.PrototypeId, callable, prototype, args, operandBase, nextIp);
             return false;
         }
 
@@ -547,6 +547,50 @@ public abstract class PdVmProgramBase : IPdVmCallableProgram
             outcome = host.Call(import.Name, args);
         }
         return ApplyCallOutcome(host, outcome, args, callIp, nextIp, calleeValue, normalizeResult: true);
+    }
+
+    protected bool DispatchCallScript(
+        IPdVmHost host,
+        PdVmHostImport[] imports,
+        uint prototypeId,
+        byte argc,
+        int callIp,
+        int nextIp)
+    {
+        _ = host;
+        _ = imports;
+        _ = callIp;
+        var activeFrame = GetActiveFrame();
+        if (_stack.Count - activeFrame.OperandStackBase < argc)
+        {
+            throw new InvalidOperationException("stack underflow");
+        }
+
+        var operandBase = _stack.Count - argc;
+        var args = _stack.Skip(operandBase).Take(argc).ToArray();
+        _stack.RemoveRange(operandBase, argc);
+        var prototype = GetPrototype(prototypeId);
+        if (prototype.Arity != argc)
+        {
+            throw new InvalidOperationException(
+                $"callable {prototypeId} expects arity {prototype.Arity}, got {argc}");
+        }
+
+        if (prototype.CaptureSlots.Length != 0 || prototype.SelfSlot.HasValue)
+        {
+            throw new InvalidOperationException(
+                $"CallScript requires an environment-free prototype {prototypeId}");
+        }
+
+        if (prototype.TargetKind != PdVmRuntimeCallableTargetKind.ScriptFunction)
+        {
+            throw new InvalidOperationException(
+                $"CallScript targeted a non-script prototype {prototypeId}");
+        }
+
+        ValidateArgumentSchema(prototype, args);
+        EnterScriptFrame(prototypeId, callable: null, prototype, args, operandBase, nextIp);
+        return false;
     }
 
     protected bool CompleteActiveFrame()
@@ -701,7 +745,7 @@ public abstract class PdVmProgramBase : IPdVmCallableProgram
 
         ValidateArgumentSchema(prototype, args);
         var operandBase = _stack.Count;
-        EnterScriptCallable(callable, prototype, args, operandBase, returnIp: 0);
+        EnterScriptFrame(callable.PrototypeId, callable, prototype, args, operandBase, returnIp: 0);
         _executionFrames[^1].Continuation = PdVmFrameContinuationKind.ReturnToManaged;
         _managedCallableResult = null;
     }
@@ -755,13 +799,20 @@ public abstract class PdVmProgramBase : IPdVmCallableProgram
         }
     }
 
-    private void EnterScriptCallable(
-        PdVmCallableValue callable,
+    private void EnterScriptFrame(
+        uint prototypeId,
+        PdVmCallableValue? callable,
         PdVmRuntimeCallablePrototype prototype,
         IReadOnlyList<PdVmValue> args,
         int operandStackBase,
         int returnIp)
     {
+        if (callable is null && (prototype.CaptureSlots.Length != 0 || prototype.SelfSlot.HasValue))
+        {
+            throw new InvalidOperationException(
+                $"CallScript requires an environment-free prototype {prototypeId}");
+        }
+
         if (_executionFrames.Count(frame => frame.PrototypeId.HasValue) >= MaximumScriptFrameDepth)
         {
             throw new InvalidOperationException($"script call stack overflow (limit {MaximumScriptFrameDepth})");
@@ -808,7 +859,7 @@ public abstract class PdVmProgramBase : IPdVmCallableProgram
             SetFrameLocal(localBase, prototype.FrameLocalCount, prototype.ParameterSlots[index], args[index], "parameter");
         }
 
-        if (callable.Environment is { } environment)
+        if (callable?.Environment is { } environment)
         {
             if (environment.Cells.Count != prototype.CaptureSlots.Length)
             {
@@ -824,7 +875,8 @@ public abstract class PdVmProgramBase : IPdVmCallableProgram
                 if (prototype.SelfSlot != slot)
                 {
                     _captureCells[absolute] = cell;
-                    if (prototype.CaptureModes[index] == PdVmRuntimeCaptureBindingMode.BorrowMut)
+                    if (prototype.CaptureModes[index] is PdVmRuntimeCaptureBindingMode.BorrowMut
+                        or PdVmRuntimeCaptureBindingMode.Move)
                     {
                         _mutableBorrowCells.Add(cell);
                     }
@@ -834,6 +886,12 @@ public abstract class PdVmProgramBase : IPdVmCallableProgram
 
         if (prototype.SelfSlot is ushort selfSlot)
         {
+            if (callable is null)
+            {
+                throw new InvalidOperationException(
+                    $"CallScript requires an environment-free prototype {prototypeId}");
+            }
+
             SetFrameLocal(
                 localBase,
                 prototype.FrameLocalCount,
@@ -848,7 +906,7 @@ public abstract class PdVmProgramBase : IPdVmCallableProgram
             operandStackBase,
             localBase,
             prototype.FrameLocalCount,
-            callable.PrototypeId));
+            prototypeId));
         InstructionPointer = checked((int)_metadata.ScriptFunctions[prototype.TargetId].EntryIp);
     }
 

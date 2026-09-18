@@ -60,6 +60,9 @@ public static class PdVmClrCompiler
     private static readonly MethodInfo StoreLocalValueMethod =
         GetBaseMethod("StoreLocalValue", typeof(byte), typeof(PdVmValue));
 
+    private static readonly MethodInfo VacateMovedFieldMethod =
+        GetBuiltinMethod(nameof(PdVmBuiltins.VacateMovedField), typeof(PdVmValue), typeof(PdVmValue), typeof(PdVmValue));
+
     private static readonly MethodInfo DispatchCallMethod =
         GetBaseMethod(
             "DispatchCall",
@@ -78,6 +81,16 @@ public static class PdVmClrCompiler
             "DispatchCallValue",
             typeof(IPdVmHost),
             typeof(PdVmHostImport[]),
+            typeof(byte),
+            typeof(int),
+            typeof(int));
+
+    private static readonly MethodInfo DispatchCallScriptMethod =
+        GetBaseMethod(
+            "DispatchCallScript",
+            typeof(IPdVmHost),
+            typeof(PdVmHostImport[]),
+            typeof(uint),
             typeof(byte),
             typeof(int),
             typeof(int));
@@ -607,6 +620,7 @@ public static class PdVmClrCompiler
             case PdVmBytecodeOpCode.Call:
                 EmitCallInstruction(
                     il,
+                    program,
                     importsField,
                     stackLayout,
                     instruction,
@@ -616,6 +630,16 @@ public static class PdVmClrCompiler
                 return;
             case PdVmBytecodeOpCode.CallValue:
                 EmitCallValueInstruction(
+                    il,
+                    importsField,
+                    instruction,
+                    dispatchLabel,
+                    executedInstructionsLocal,
+                    evaluationStack,
+                    stackDepth);
+                return;
+            case PdVmBytecodeOpCode.CallScript:
+                EmitCallScriptInstruction(
                     il,
                     importsField,
                     instruction,
@@ -935,6 +959,7 @@ public static class PdVmClrCompiler
 
     private static void EmitCallInstruction(
         ILGenerator il,
+        PdVmProgramModel program,
         FieldBuilder importsField,
         PdVmStackLayout stackLayout,
         PdVmInstruction instruction,
@@ -948,6 +973,19 @@ public static class PdVmClrCompiler
         {
             var argc = instruction.ArgCount!.Value;
             var resultIndex = stackDepth - argc;
+            if (builtin == PdVmBuiltin.Set &&
+                argc == 3 &&
+                resultIndex > 0 &&
+                IsAbi25MoveFieldVacate(program, instruction))
+            {
+                il.Emit(OpCodes.Ldloc, evaluationStack[resultIndex]);
+                il.Emit(OpCodes.Ldloc, evaluationStack[resultIndex + 1]);
+                il.Emit(OpCodes.Ldloc, evaluationStack[resultIndex - 1]);
+                il.Emit(OpCodes.Call, VacateMovedFieldMethod);
+                il.Emit(OpCodes.Stloc, evaluationStack[resultIndex]);
+                return;
+            }
+
             for (var index = 0; index < argc; index++)
             {
                 il.Emit(OpCodes.Ldloc, evaluationStack[resultIndex + index]);
@@ -1002,6 +1040,31 @@ public static class PdVmClrCompiler
         EmitInt32(il, instruction.Offset);
         EmitInt32(il, instruction.NextOffset);
         il.Emit(OpCodes.Call, DispatchCallValueMethod);
+        il.Emit(OpCodes.Brfalse, continueDispatch);
+        EmitReturnStatus(il, executedInstructionsLocal, GetLastStatusMethod);
+        il.MarkLabel(continueDispatch);
+        il.Emit(OpCodes.Br, dispatchLabel);
+    }
+
+    private static void EmitCallScriptInstruction(
+        ILGenerator il,
+        FieldBuilder importsField,
+        PdVmInstruction instruction,
+        Label dispatchLabel,
+        LocalBuilder executedInstructionsLocal,
+        IReadOnlyList<LocalBuilder> evaluationStack,
+        int stackDepth)
+    {
+        EmitPersistExecutionState(il, evaluationStack, stackDepth);
+        var continueDispatch = il.DefineLabel();
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Ldarg_1);
+        il.Emit(OpCodes.Ldsfld, importsField);
+        EmitInt32(il, checked((int)instruction.PrototypeId!.Value));
+        EmitInt32(il, instruction.ArgCount!.Value);
+        EmitInt32(il, instruction.Offset);
+        EmitInt32(il, instruction.NextOffset);
+        il.Emit(OpCodes.Call, DispatchCallScriptMethod);
         il.Emit(OpCodes.Brfalse, continueDispatch);
         EmitReturnStatus(il, executedInstructionsLocal, GetLastStatusMethod);
         il.MarkLabel(continueDispatch);
@@ -1275,6 +1338,56 @@ public static class PdVmClrCompiler
         }
 
         il.Emit(OpCodes.Ldc_I4, value);
+    }
+
+    private static bool IsAbi25MoveFieldVacate(PdVmProgramModel program, PdVmInstruction setInstruction)
+    {
+        var instructions = program.Instructions;
+        var setIndex = -1;
+        for (var index = 0; index < instructions.Count; index++)
+        {
+            if (instructions[index].Offset == setInstruction.Offset)
+            {
+                setIndex = index;
+                break;
+            }
+        }
+
+        if (setIndex < 6)
+        {
+            return false;
+        }
+
+        var ldcNull = instructions[setIndex - 1];
+        var ldcKeyAfter = instructions[setIndex - 2];
+        var ldRootAfter = instructions[setIndex - 3];
+        var callGet = instructions[setIndex - 4];
+        var ldcKeyBefore = instructions[setIndex - 5];
+        var ldRootBefore = instructions[setIndex - 6];
+        if (ldcNull.OpCode != PdVmBytecodeOpCode.Ldc ||
+            ldcNull.ConstantIndex is not int nullIndex ||
+            nullIndex < 0 ||
+            nullIndex >= program.Constants.Count ||
+            program.Constants[nullIndex].Kind != PdVmValueKind.Null)
+        {
+            return false;
+        }
+
+        if (callGet.OpCode != PdVmBytecodeOpCode.Call ||
+            callGet.ArgCount != 2 ||
+            callGet.CallIndex is not ushort getIndex ||
+            !PdVmBuiltins.TryGetBuiltin(getIndex, out var getBuiltin) ||
+            getBuiltin != PdVmBuiltin.Get)
+        {
+            return false;
+        }
+
+        return ldRootBefore.OpCode == PdVmBytecodeOpCode.Ldloc &&
+            ldRootAfter.OpCode == PdVmBytecodeOpCode.Ldloc &&
+            ldRootBefore.LocalIndex == ldRootAfter.LocalIndex &&
+            ldcKeyBefore.OpCode == PdVmBytecodeOpCode.Ldc &&
+            ldcKeyAfter.OpCode == PdVmBytecodeOpCode.Ldc &&
+            ldcKeyBefore.ConstantIndex == ldcKeyAfter.ConstantIndex;
     }
 
     private static MethodInfo GetBaseMethod(string name, params Type[] parameterTypes) =>

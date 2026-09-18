@@ -39,6 +39,7 @@ public enum PdVmBuiltin
     ReSplit,
     ReCaptures,
     JsonEncode,
+    SqliteOpen,
     JsonDecode,
     JitSetConfig,
     JitGetConfig,
@@ -114,8 +115,8 @@ public enum PdVmBuiltin
 
 public static class PdVmBuiltins
 {
-    public const ushort BuiltinCallBase = 0xFFA3;
-    public const ushort BuiltinCallCount = 89;
+    public const ushort BuiltinCallBase = 0xFFA2;
+    public const ushort BuiltinCallCount = 90;
 
     public static PdVmValue LenValue(PdVmValue value) => DispatchLen(new[] { value });
 
@@ -137,6 +138,21 @@ public static class PdVmBuiltins
 
     public static PdVmValue SetValue(PdVmValue container, PdVmValue key, PdVmValue value) =>
         DispatchSet(new[] { container, key, value });
+
+    public static PdVmValue VacateMovedField(PdVmValue container, PdVmValue key, PdVmValue movedValue)
+    {
+        // ABI 25 lowers MoveField to Get + set-null. Copyable scalars must stay
+        // in the map; resource values transfer once and the field is removed.
+        if (IsCopyableScalar(movedValue))
+        {
+            return container;
+        }
+
+        return SetValue(container, key, PdVmValue.Null());
+    }
+
+    private static bool IsCopyableScalar(PdVmValue value) =>
+        value.Kind is PdVmValueKind.Int or PdVmValueKind.Float or PdVmValueKind.Bool;
 
     public static PdVmValue KeysValue(PdVmValue container) => DispatchKeys(new[] { container });
 
@@ -352,6 +368,7 @@ public static class PdVmBuiltins
                 or PdVmBuiltin.IoClose
                 or PdVmBuiltin.IoExists
                 or PdVmBuiltin.JsonEncode
+                or PdVmBuiltin.SqliteOpen
                 or PdVmBuiltin.JsonDecode
                 or PdVmBuiltin.JitSetEnabled
                 or PdVmBuiltin.JitSetHotLoopThreshold
@@ -543,6 +560,8 @@ public static class PdVmBuiltins
             PdVmBuiltin.ReSplit => ReturnOne(DispatchRegexSplit(args)),
             PdVmBuiltin.ReCaptures => ReturnOne(DispatchRegexCaptures(args)),
             PdVmBuiltin.JsonEncode => ReturnOne(DispatchJsonEncode(args)),
+            PdVmBuiltin.SqliteOpen => throw new NotSupportedException(
+                "builtin SqliteOpen is not implemented"),
             PdVmBuiltin.JsonDecode => ReturnOne(DispatchJsonDecode(args)),
             PdVmBuiltin.Count => ReturnOne(CountValue(GetArg(args, 0))),
             PdVmBuiltin.FormatTemplate => ReturnOne(FormatTemplateValue(GetArg(args, 0), GetArg(args, 1))),
@@ -563,7 +582,7 @@ public static class PdVmBuiltins
                 or PdVmBuiltin.MapIterClose
                 or PdVmBuiltin.BindCallable
                 or PdVmBuiltin.DetachLocal => throw new NotSupportedException(
-                    $"builtin {builtin} requires the VMBC v10 callable runtime"),
+                    $"builtin {builtin} requires the VMBC v13 callable runtime"),
             PdVmBuiltin.JitSetConfig
                 or PdVmBuiltin.JitGetConfig
                 or PdVmBuiltin.JitSetEnabled
@@ -941,6 +960,7 @@ public static class PdVmBuiltins
     private static PdVmValue SetMapValue(PdVmMap map, PdVmValue key, PdVmValue value)
     {
         var output = map.CloneMap();
+        // Frozen core builtin_set_map removes the key when value is null.
         if (value.Kind == PdVmValueKind.Null)
         {
             output.Remove(key);
