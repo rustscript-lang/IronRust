@@ -35,6 +35,7 @@ dotnet publish (Join-Path $repoRoot 'PdVm.Runner/PdVm.Runner.csproj') `
     --configuration Release `
     --runtime $RuntimeIdentifier `
     --self-contained false `
+    -p:UseAppHost=true `
     -p:DebugSymbols=true `
     -p:DebugType=portable `
     --output $packageRoot
@@ -61,6 +62,7 @@ Copy-Item -LiteralPath (Join-Path $nativeRoot $cargoNativeName) -Destination (Jo
 Get-ChildItem -LiteralPath $nativeRoot -Filter '*.pdb' -File | Copy-Item -Destination $packageRoot
 
 $requiredFiles = @(
+    $(if ($RuntimeIdentifier -eq 'win-x64') { 'PdVm.Runner.exe' } else { 'PdVm.Runner' }),
     'PdVm.Runner.dll',
     'PdVm.Runner.pdb',
     'PdVm.Compiler.dll',
