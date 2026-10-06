@@ -4,7 +4,8 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::ptr;
 
-use edge::{ABI_VERSION, compile_edge_source_file, function_by_name, host_namespace_specs};
+use edge::{ABI_VERSION, function_by_name, host_namespace_specs};
+use pd_vm_compiler::compile_edge_source_file;
 
 const FROZEN_CORE_REV: &str = "b1d6cffede77f49410bf63525f30b9a46b02dc01";
 const FROZEN_CORE_URL: &str = "https://github.com/rustscript-lang/rustscript.git";
@@ -158,10 +159,31 @@ fn the_lockfile_proves_frozen_core_and_edge_sources() {
             "Cargo.lock must prove {package} at {expected_core}; core={proven_core:?}"
         );
     }
-    for package in ["pd-edge", "pd-edge-abi", "pd-edge-host-function"] {
+    assert!(
+        proven_edge.contains("pd-edge-abi"),
+        "Cargo.lock must prove pd-edge-abi at {expected_edge}; edge={proven_edge:?}"
+    );
+}
+
+#[test]
+fn compiler_dependencies_exclude_protocol_and_database_implementations() {
+    let lock = read(&manifest_dir().join("Cargo.lock"));
+    let packages = parse_lock_packages(&lock);
+    for forbidden in [
+        "pd-edge",
+        "pd-edge-host-function",
+        "tokio",
+        "hyper",
+        "axum",
+        "rustls",
+        "rusqlite",
+        "libsqlite3-sys",
+        "mimalloc",
+        "aws-lc-rs",
+    ] {
         assert!(
-            proven_edge.contains(package),
-            "Cargo.lock must prove {package} at {expected_edge}; edge={proven_edge:?}"
+            !packages.iter().any(|package| package.name == forbidden),
+            "compiler lockfile contains runtime implementation {forbidden}"
         );
     }
 }
@@ -397,6 +419,12 @@ fn native_compiler_compiles_and_executes_the_non_overlay_example_corpus() {
         let vmbc = compile_via_c_abi(path);
         let program = vm::decode_program(&vmbc)
             .unwrap_or_else(|error| panic!("{} VMBC decode failed: {error}", path.display()));
+        assert_eq!(
+            vmbc,
+            vm::encode_program(&program).expect("frozen upstream encoding"),
+            "{} compiler-only encoding must match upstream byte for byte",
+            path.display()
+        );
         assert_eq!(
             u16::from_le_bytes(vmbc[4..6].try_into().expect("VMBC version bytes")),
             13,

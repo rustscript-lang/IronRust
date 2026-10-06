@@ -1,9 +1,13 @@
 use std::path::Path;
 use std::ptr;
 
-use edge::{ABI_VERSION, compile_edge_source_file, function_by_name};
+use edge::{ABI_VERSION, function_by_name};
+
+mod catalog;
+pub use catalog::compile_edge_source_file;
 
 mod vmbc;
+mod wire;
 
 const STATUS_OK: i32 = 0;
 const STATUS_COMPILE_ERROR: i32 = 1;
@@ -92,7 +96,7 @@ fn compile_source_path(path: &Path) -> Result<Vec<u8>, (i32, String)> {
     fail_closed_on_stale_catalog(&compiled.program)?;
     let local_count = compiled.locals;
     let program = compiled.program.with_local_count(local_count);
-    vmbc::encode_program(&program).map_err(|error| (STATUS_COMPILE_ERROR, error))
+    vmbc::encode_program(program).map_err(|error| (STATUS_COMPILE_ERROR, error))
 }
 
 fn source_needs_edge_catalog(path: &Path) -> bool {
@@ -201,7 +205,12 @@ mod tests {
     fn pinned_rust_runtime_matches_shared_callable_parity_fixture() {
         let source = include_str!("../../../tests/fixtures/callable-parity.rss");
         let compiled = vm::compile_source(source).expect("shared callable fixture should compile");
-        let mut runtime = vm::Vm::new(compiled.program.with_local_count(compiled.locals));
+        let program = compiled.program.with_local_count(compiled.locals);
+        assert_eq!(
+            vmbc::encode_program(program.clone()).expect("compiler-only encoding"),
+            vm::encode_program(&program).expect("frozen upstream encoding")
+        );
+        let mut runtime = vm::Vm::new(program);
 
         let status = runtime
             .run()

@@ -9,5 +9,10 @@ publish = false
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-edge = { package = "pd-edge", git = "https://github.com/rustscript-lang/pd-edge.git", rev = "5f4f889e349bdfbd5534deb42bd13b616a6114f5" }
+# ABI declarations only: none of these features includes a protocol implementation.
+edge = { package = "pd-edge-abi", git = "https://github.com/rustscript-lang/pd-edge.git", rev = "5f4f889e349bdfbd5534deb42bd13b616a6114f5", default-features = false, features = ["console", "http", "tls", "websocket"] }
+vm = { package = "pd-vm", git = "https://github.com/rustscript-lang/rustscript.git", rev = "b1d6cffede77f49410bf63525f30b9a46b02dc01", default-features = false }
+
+[dev-dependencies]
+# Execute parity fixtures and compare the frozen upstream encoder in tests only.
 vm = { package = "pd-vm", git = "https://github.com/rustscript-lang/rustscript.git", rev = "b1d6cffede77f49410bf63525f30b9a46b02dc01", default-features = false, features = ["runtime"] }

@@ -43,8 +43,11 @@ jobs:
       - name: Build and test native compiler
         shell: pwsh
         run: |
-          cargo build --locked --manifest-path native/pd-vm-compiler/Cargo.toml
-          cargo test --locked --manifest-path native/pd-vm-compiler/Cargo.toml
+          cargo test --locked --target-dir native/pd-vm-compiler/target/parity-tests --manifest-path native/pd-vm-compiler/Cargo.toml
+          if ($LASTEXITCODE -ne 0) { throw 'Native compiler tests failed' }
+          ./scripts/check-native-compiler.ps1
+          cargo build --locked --lib --manifest-path native/pd-vm-compiler/Cargo.toml
+          if ($LASTEXITCODE -ne 0) { throw 'Native compiler build failed' }
 
       - name: Test managed projects
         shell: pwsh

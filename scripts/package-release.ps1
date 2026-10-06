@@ -24,9 +24,12 @@ $examplesSource = Join-Path $repoRoot 'examples'
 $examplesDestination = Join-Path $packageRoot 'examples'
 Copy-Item -LiteralPath $examplesSource -Destination $examplesDestination -Recurse
 Copy-Item -LiteralPath (Join-Path $repoRoot 'run-minesweeper.bat') -Destination $packageRoot
+Copy-Item -LiteralPath (Join-Path $repoRoot 'native/pd-vm-compiler/LICENSE.rustscript') -Destination $packageRoot
+Copy-Item -LiteralPath (Join-Path $repoRoot 'native/pd-vm-compiler/LICENSE.pd-edge') -Destination $packageRoot
 
 $manifest = Join-Path $repoRoot 'native/pd-vm-compiler/Cargo.toml'
-cargo build --locked --release --target $RustTarget --manifest-path $manifest
+& (Join-Path $PSScriptRoot 'check-native-compiler.ps1') -RustTarget $RustTarget
+cargo build --locked --release --lib --target $RustTarget --manifest-path $manifest
 if ($LASTEXITCODE -ne 0) {
     throw 'Native pd-vm compiler build failed'
 }

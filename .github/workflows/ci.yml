@@ -27,11 +27,14 @@ jobs:
       - name: Native compiler fmt
         run: cargo fmt --all --check --manifest-path native/pd-vm-compiler/Cargo.toml
       - name: Native compiler clippy
-        run: cargo clippy --locked --all-targets --all-features --manifest-path native/pd-vm-compiler/Cargo.toml -- -D warnings
-      - name: Build native compiler
-        run: cargo build --locked --release --all-targets --all-features --manifest-path native/pd-vm-compiler/Cargo.toml
+        run: cargo clippy --locked --all-targets --all-features --target-dir native/pd-vm-compiler/target/parity-tests --manifest-path native/pd-vm-compiler/Cargo.toml -- -D warnings
       - name: Test native compiler
-        run: cargo test --locked --release --all-targets --all-features --manifest-path native/pd-vm-compiler/Cargo.toml -- --test-threads=1
+        run: cargo test --locked --release --all-targets --all-features --target-dir native/pd-vm-compiler/target/parity-tests --manifest-path native/pd-vm-compiler/Cargo.toml -- --test-threads=1
+      - name: Check compiler-only dependencies
+        shell: pwsh
+        run: ./scripts/check-native-compiler.ps1
+      - name: Build native compiler
+        run: cargo build --locked --release --lib --manifest-path native/pd-vm-compiler/Cargo.toml
       - name: Select native compiler library
         shell: pwsh
         run: |

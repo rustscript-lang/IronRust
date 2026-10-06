@@ -1,0 +1,46 @@
+// Convenience wrappers over the default outbound HTTP exchange request.
+use http;
+
+fn upstream_request_default_exchange() -> int {
+    http::exchange::default_upstream()
+}
+
+pub fn set_header(name: string, value: string) {
+    http::exchange::set_header(upstream_request_default_exchange(), name, value)
+}
+
+pub fn set_method(method: string) {
+    http::exchange::set_method(upstream_request_default_exchange(), method)
+}
+
+pub fn set_path(path: string) {
+    http::exchange::set_path(upstream_request_default_exchange(), path)
+}
+
+pub fn set_query(query: string) {
+    http::exchange::set_query(upstream_request_default_exchange(), query)
+}
+
+pub fn set_target(host: string, port: int) {
+    http::exchange::set_target(upstream_request_default_exchange(), host, port)
+}
+
+pub fn set_scheme(scheme: string) {
+    http::exchange::set_scheme(upstream_request_default_exchange(), scheme)
+}
+
+pub fn set_body(body: string) {
+    http::exchange::set_body(upstream_request_default_exchange(), body)
+}
+
+pub fn add_header(name: string, value: string) {
+    http::exchange::add_header(upstream_request_default_exchange(), name, value)
+}
+
+pub fn clear_header(name: string) {
+    http::exchange::clear_header(upstream_request_default_exchange(), name)
+}
+
+pub fn set_query_arg(name: string, value: string) {
+    http::exchange::set_query_arg(upstream_request_default_exchange(), name, value)
+}
