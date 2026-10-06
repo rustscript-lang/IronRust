@@ -431,11 +431,11 @@ fn render_board(render_rows: int, render_columns: int, render_paused: bool, rend
     let mut render_styles = new_board_array(render_rows * render_columns);
     let mut render_index = 0;
     while render_index < render_rows * render_columns {
-        let mut render_style = current_display[render_index].copy();
+        let mut render_style = (&current_display)[render_index];
         if render_paused {
             render_style = 0;
         }
-        if render_flash_until > 0 && current_flash_cells[render_index].copy() == 1 {
+        if render_flash_until > 0 && (&current_flash_cells)[render_index] == 1 {
             render_style = 2;
         }
         if render_index == render_pressed_index && render_style == 0 {
@@ -458,19 +458,19 @@ fn reset_game() -> null {
     game.paused_total = 0;
     game.elapsed = 0;
     game.flag_count = 0;
-    game.safe_remaining = game.rows.copy() * game.columns.copy() - game.mine_total.copy();
-    mines = new_board_array(game.rows.copy() * game.columns.copy());
-    revealed = new_board_array(game.rows.copy() * game.columns.copy());
-    flagged = new_board_array(game.rows.copy() * game.columns.copy());
-    display = new_board_array(game.rows.copy() * game.columns.copy());
-    flash_cells = new_board_array(game.rows.copy() * game.columns.copy());
+    game.safe_remaining = (&game).rows * (&game).columns - (&game).mine_total;
+    mines = new_board_array((&game).rows * (&game).columns);
+    revealed = new_board_array((&game).rows * (&game).columns);
+    flagged = new_board_array((&game).rows * (&game).columns);
+    display = new_board_array((&game).rows * (&game).columns);
+    flash_cells = new_board_array((&game).rows * (&game).columns);
     game.flash_until = 0;
     game.pressed_index = -1;
-    Visuals::SetSpriteText(mine_counter, format_counter(game.mine_total.copy()));
+    Visuals::SetSpriteText(mine_counter, format_counter((&game).mine_total));
     Visuals::SetSpriteText(time_counter, "000");
     Visuals::SetControlBitmap(face, smile_bitmap);
     ToolStripMenuItem::SetToolStripMenuItemChecked(pause_item, false);
-    let _board_rendered = render_board(game.rows.copy(), game.columns.copy(), game.paused.copy(), game.flash_until.copy(), game.pressed_index.copy());
+    let _board_rendered = render_board((&game).rows, (&game).columns, (&game).paused, (&game).flash_until, (&game).pressed_index);
     null
 }
 
@@ -480,30 +480,30 @@ fn select_difficulty(new_rows: int, new_columns: int, new_mine_total: int, new_d
     game.columns = new_columns;
     game.mine_total = new_mine_total;
     game.difficulty = new_difficulty;
-    let board_width = game.columns.copy() * 32 + 16;
-    let board_height = game.rows.copy() * 32 + 16;
+    let board_width = (&game).columns * 32 + 16;
+    let board_height = (&game).rows * 32 + 16;
     Visuals::SetClientSize(form, board_width + 38, board_height + 176);
     Visuals::SetControlBounds(status_panel, 19, 40, board_width, 112);
     Visuals::SetControlBounds(board_panel, 19, 164, board_width, board_height);
     Visuals::SetControlBounds(face, (board_width - 60) / 2, 22, 60, 62);
     Visuals::SetControlBounds(time_counter, board_width - 100, 24, 86, 60);
-    let _board_nodes_updated = set_board_nodes(board_surface, game.rows.copy(), game.columns.copy());
-    ToolStripMenuItem::SetToolStripMenuItemChecked(beginner_item, game.difficulty.copy() == 0);
-    ToolStripMenuItem::SetToolStripMenuItemChecked(intermediate_item, game.difficulty.copy() == 1);
-    ToolStripMenuItem::SetToolStripMenuItemChecked(expert_item, game.difficulty.copy() == 2);
-    ToolStripMenuItem::SetToolStripMenuItemChecked(custom_item, game.difficulty.copy() == 3);
+    let _board_nodes_updated = set_board_nodes(board_surface, (&game).rows, (&game).columns);
+    ToolStripMenuItem::SetToolStripMenuItemChecked(beginner_item, (&game).difficulty == 0);
+    ToolStripMenuItem::SetToolStripMenuItemChecked(intermediate_item, (&game).difficulty == 1);
+    ToolStripMenuItem::SetToolStripMenuItemChecked(expert_item, (&game).difficulty == 2);
+    ToolStripMenuItem::SetToolStripMenuItemChecked(custom_item, (&game).difficulty == 3);
     let _game_reset = reset_game();
     null
 }
 
 fn open_cell(open_index: int) -> null {
     let mut game = &mut state;
-    if open_index >= 0 && game.active.copy() && !game.paused.copy() && flagged[open_index].copy() != 1 && revealed[open_index].copy() == 0 {
-        if !game.started.copy() {
+    if open_index >= 0 && (&game).active && !(&game).paused && (&flagged)[open_index] != 1 && (&revealed)[open_index] == 0 {
+        if !(&game).started {
             let mut placed = 0;
-            while placed < game.mine_total.copy() {
-                let position = Random::NextInt32Instance(random, game.rows.copy() * game.columns.copy());
-                if position != open_index && mines[position].copy() == 0 {
+            while placed < (&game).mine_total {
+                let position = Random::NextInt32Instance(random, (&game).rows * (&game).columns);
+                if position != open_index && (&mines)[position] == 0 {
                     mines[position] = 1;
                     placed = placed + 1;
                 }
@@ -512,38 +512,38 @@ fn open_cell(open_index: int) -> null {
             game.started_at = MonotonicClock::GetMilliseconds();
         }
 
-        if mines[open_index].copy() == 1 {
+        if (&mines)[open_index] == 1 {
             game.active = false;
             game.started = false;
             Visuals::SetControlBitmap(face, dead_bitmap);
             let mut loss_index = 0;
-            while loss_index < game.rows.copy() * game.columns.copy() {
-                if mines[loss_index].copy() == 1 {
+            while loss_index < (&game).rows * (&game).columns {
+                if (&mines)[loss_index] == 1 {
                     if loss_index == open_index {
                         display[loss_index] = 12;
                     } else {
                         display[loss_index] = 11;
                     }
                 }
-                if mines[loss_index].copy() == 0 && flagged[loss_index].copy() == 1 {
+                if (&mines)[loss_index] == 0 && (&flagged)[loss_index] == 1 {
                     display[loss_index] = 13;
                 }
                 loss_index = loss_index + 1;
             }
         } else {
-            let mut queue = new_board_array(game.rows.copy() * game.columns.copy());
-            let mut queued = new_board_array(game.rows.copy() * game.columns.copy());
+            let mut queue = new_board_array((&game).rows * (&game).columns);
+            let mut queued = new_board_array((&game).rows * (&game).columns);
             queue[0] = open_index;
             queued[open_index] = 1;
             let mut queue_index = 0;
             let mut queue_length = 1;
             while queue_index < queue_length {
-                let current = queue[queue_index].copy();
-                if revealed[current].copy() == 0 && flagged[current].copy() != 1 && mines[current].copy() == 0 {
+                let current = (&queue)[queue_index];
+                if (&revealed)[current] == 0 && (&flagged)[current] != 1 && (&mines)[current] == 0 {
                     revealed[current] = 1;
-                    game.safe_remaining = game.safe_remaining.copy() - 1;
-                    let current_row = current / game.columns.copy();
-                    let current_column = current % game.columns.copy();
+                    game.safe_remaining = (&game).safe_remaining - 1;
+                    let current_row = current / (&game).columns;
+                    let current_column = current % (&game).columns;
                     let mut count = 0;
                     let mut count_row_delta = -1;
                     while count_row_delta <= 1 {
@@ -552,9 +552,9 @@ fn open_cell(open_index: int) -> null {
                             let count_row = current_row + count_row_delta;
                             let count_column = current_column + count_column_delta;
                             if (count_row_delta != 0 || count_column_delta != 0) &&
-                               count_row >= 0 && count_row < game.rows.copy() &&
-                               count_column >= 0 && count_column < game.columns.copy() {
-                                count = count + mines[count_row * game.columns.copy() + count_column].copy();
+                               count_row >= 0 && count_row < (&game).rows &&
+                               count_column >= 0 && count_column < (&game).columns {
+                                count = count + (&mines)[count_row * (&game).columns + count_column];
                             }
                             count_column_delta = count_column_delta + 1;
                         }
@@ -569,12 +569,12 @@ fn open_cell(open_index: int) -> null {
                             while reveal_column_delta <= 1 {
                                 let reveal_row = current_row + reveal_row_delta;
                                 let reveal_column = current_column + reveal_column_delta;
-                                if reveal_row >= 0 && reveal_row < game.rows.copy() &&
-                                   reveal_column >= 0 && reveal_column < game.columns.copy() {
-                                    let neighbor = reveal_row * game.columns.copy() + reveal_column;
-                                    if revealed[neighbor].copy() == 0 &&
-                                       flagged[neighbor].copy() != 1 &&
-                                       queued[neighbor].copy() == 0 {
+                                if reveal_row >= 0 && reveal_row < (&game).rows &&
+                                   reveal_column >= 0 && reveal_column < (&game).columns {
+                                    let neighbor = reveal_row * (&game).columns + reveal_column;
+                                    if (&revealed)[neighbor] == 0 &&
+                                       (&flagged)[neighbor] != 1 &&
+                                       (&queued)[neighbor] == 0 {
                                         queue[queue_length] = neighbor;
                                         queued[neighbor] = 1;
                                         queue_length = queue_length + 1;
@@ -588,26 +588,26 @@ fn open_cell(open_index: int) -> null {
                 }
                 queue_index = queue_index + 1;
             }
-            if game.safe_remaining.copy() == 0 {
-                game.elapsed = (MonotonicClock::GetMilliseconds() - game.started_at.copy() - game.paused_total.copy()) / 1000;
+            if (&game).safe_remaining == 0 {
+                game.elapsed = (MonotonicClock::GetMilliseconds() - (&game).started_at - (&game).paused_total) / 1000;
                 game.active = false;
                 game.started = false;
-                game.flag_count = game.mine_total.copy();
+                game.flag_count = (&game).mine_total;
                 Visuals::SetSpriteText(mine_counter, "000");
-                Visuals::SetSpriteText(time_counter, format_counter(game.elapsed.copy()));
+                Visuals::SetSpriteText(time_counter, format_counter((&game).elapsed));
                 Visuals::SetControlBitmap(face, win_bitmap);
-                if game.difficulty.copy() == 0 && (game.beginner_best_time.copy() < 0 || game.elapsed.copy() < game.beginner_best_time.copy()) {
-                    game.beginner_best_time = game.elapsed.copy();
+                if (&game).difficulty == 0 && ((&game).beginner_best_time < 0 || (&game).elapsed < (&game).beginner_best_time) {
+                    game.beginner_best_time = (&game).elapsed;
                 }
-                if game.difficulty.copy() == 1 && (game.intermediate_best_time.copy() < 0 || game.elapsed.copy() < game.intermediate_best_time.copy()) {
-                    game.intermediate_best_time = game.elapsed.copy();
+                if (&game).difficulty == 1 && ((&game).intermediate_best_time < 0 || (&game).elapsed < (&game).intermediate_best_time) {
+                    game.intermediate_best_time = (&game).elapsed;
                 }
-                if game.difficulty.copy() == 2 && (game.expert_best_time.copy() < 0 || game.elapsed.copy() < game.expert_best_time.copy()) {
-                    game.expert_best_time = game.elapsed.copy();
+                if (&game).difficulty == 2 && ((&game).expert_best_time < 0 || (&game).elapsed < (&game).expert_best_time) {
+                    game.expert_best_time = (&game).elapsed;
                 }
                 let mut win_index = 0;
-                while win_index < game.rows.copy() * game.columns.copy() {
-                    if mines[win_index].copy() == 1 {
+                while win_index < (&game).rows * (&game).columns {
+                    if (&mines)[win_index] == 1 {
                         flagged[win_index] = 1;
                         display[win_index] = 1;
                     }
@@ -621,20 +621,20 @@ fn open_cell(open_index: int) -> null {
 
 fn on_pause() -> null {
     let mut game = &mut state;
-    if game.active.copy() && game.started.copy() => {
-        if game.paused.copy() {
+    if (&game).active && (&game).started => {
+        if (&game).paused {
             game.paused = false;
-            game.paused_total = game.paused_total.copy() + MonotonicClock::GetMilliseconds() - game.pause_started_at.copy();
+            game.paused_total = (&game).paused_total + MonotonicClock::GetMilliseconds() - (&game).pause_started_at;
         } else {
             let pause_now = MonotonicClock::GetMilliseconds();
-            game.elapsed = (pause_now - game.started_at.copy() - game.paused_total.copy()) / 1000;
-            Visuals::SetSpriteText(time_counter, format_counter(game.elapsed.copy()));
+            game.elapsed = (pause_now - (&game).started_at - (&game).paused_total) / 1000;
+            Visuals::SetSpriteText(time_counter, format_counter((&game).elapsed));
             game.paused = true;
             game.pause_started_at = pause_now;
             game.pressed_index = -1;
         }
-        ToolStripMenuItem::SetToolStripMenuItemChecked(pause_item, game.paused.copy());
-        let _board_rendered = render_board(game.rows.copy(), game.columns.copy(), game.paused.copy(), game.flash_until.copy(), game.pressed_index.copy());
+        ToolStripMenuItem::SetToolStripMenuItemChecked(pause_item, (&game).paused);
+        let _board_rendered = render_board((&game).rows, (&game).columns, (&game).paused, (&game).flash_until, (&game).pressed_index);
         null
     } else => { null };
     null
@@ -655,12 +655,12 @@ fn on_expert() -> null {
 }
 
 fn on_custom() -> null {
-    let mut game = &mut state;
-    let custom_values = show_custom_fields(form, game.rows.copy(), game.columns.copy(), game.mine_total.copy());
-    if custom_values[0].copy() == "ok" {
-        let requested_rows = parse_positive_int(custom_values[1].copy());
-        let requested_columns = parse_positive_int(custom_values[2].copy());
-        let requested_mines = parse_positive_int(custom_values[3].copy());
+    let game = &state;
+    let custom_values = show_custom_fields(form, (&game).rows, (&game).columns, (&game).mine_total);
+    if custom_values[0] == "ok" {
+        let requested_rows = parse_positive_int(custom_values[1]);
+        let requested_columns = parse_positive_int(custom_values[2]);
+        let requested_mines = parse_positive_int(custom_values[3]);
         if requested_rows < 8 || requested_rows > 24 || requested_columns < 8 || requested_columns > 30 {
             Visuals::ShowMessage(form, "Height must be from 8 to 24, and width must be from 8 to 30.", "Custom Field");
         } else {
@@ -675,13 +675,13 @@ fn on_custom() -> null {
 }
 fn on_marks() -> null {
     let mut game = &mut state;
-    game.marks_enabled = !game.marks_enabled.copy();
-    ToolStripMenuItem::SetToolStripMenuItemChecked(marks_item, game.marks_enabled.copy());
+    game.marks_enabled = !(&game).marks_enabled;
+    ToolStripMenuItem::SetToolStripMenuItemChecked(marks_item, (&game).marks_enabled);
     let mut board_changed = false;
-    if !game.marks_enabled.copy() {
+    if !(&game).marks_enabled {
         let mut mark_index = 0;
-        while mark_index < game.rows.copy() * game.columns.copy() {
-            if flagged[mark_index].copy() == 2 {
+        while mark_index < (&game).rows * (&game).columns {
+            if (&flagged)[mark_index] == 2 {
                 flagged[mark_index] = 0;
                 display[mark_index] = 0;
                 board_changed = true;
@@ -690,35 +690,35 @@ fn on_marks() -> null {
         }
     }
     if board_changed {
-        let _board_rendered = render_board(game.rows.copy(), game.columns.copy(), game.paused.copy(), game.flash_until.copy(), game.pressed_index.copy());
+        let _board_rendered = render_board((&game).rows, (&game).columns, (&game).paused, (&game).flash_until, (&game).pressed_index);
     }
     null
 }
 fn on_color() -> null {
     let mut game = &mut state;
-    game.color_enabled = !game.color_enabled.copy();
-    ToolStripMenuItem::SetToolStripMenuItemChecked(color_item, game.color_enabled.copy());
-    if game.color_enabled.copy() {
+    game.color_enabled = !(&game).color_enabled;
+    ToolStripMenuItem::SetToolStripMenuItemChecked(color_item, (&game).color_enabled);
+    if (&game).color_enabled {
         Scene::ConfigureStyles(board_surface, cell_border_styles, cell_backgrounds, cell_border_colors, cell_foregrounds, cell_texts, cell_sprites);
     } else {
         Scene::ConfigureStyles(board_surface, cell_border_styles, cell_backgrounds, cell_border_colors, monochrome_foregrounds, cell_texts, cell_sprites);
     }
-    let _board_rendered = render_board(game.rows.copy(), game.columns.copy(), game.paused.copy(), game.flash_until.copy(), game.pressed_index.copy());
+    let _board_rendered = render_board((&game).rows, (&game).columns, (&game).paused, (&game).flash_until, (&game).pressed_index);
     null
 }
 fn on_best_times() -> null {
-    let mut game = &mut state;
-    let beginner_time = format_best_time(game.beginner_best_time.copy());
-    let intermediate_time = format_best_time(game.intermediate_best_time.copy());
-    let expert_time = format_best_time(game.expert_best_time.copy());
+    let game = &state;
+    let beginner_time = format_best_time((&game).beginner_best_time);
+    let intermediate_time = format_best_time((&game).intermediate_best_time);
+    let expert_time = format_best_time((&game).expert_best_time);
     Visuals::ShowMessage(form, "Beginner: " + beginner_time + " seconds\nIntermediate: " + intermediate_time + " seconds\nExpert: " + expert_time + " seconds", "Best Times");
     null
 }
 fn on_board_down(event: map<string>) -> null {
     let mut game = &mut state;
-    if event.button.copy() == "Left" && game.active.copy() && !game.paused.copy() => {
-        game.pressed_index = board_index_at(parse_positive_int(event.x.copy()), parse_positive_int(event.y.copy()), game.rows.copy(), game.columns.copy());
-        let _board_rendered = render_board(game.rows.copy(), game.columns.copy(), game.paused.copy(), game.flash_until.copy(), game.pressed_index.copy());
+    if event.button == "Left" && (&game).active && !(&game).paused => {
+        game.pressed_index = board_index_at(parse_positive_int(event.x), parse_positive_int(event.y), (&game).rows, (&game).columns);
+        let _board_rendered = render_board((&game).rows, (&game).columns, (&game).paused, (&game).flash_until, (&game).pressed_index);
         null
     } else => { null };
     null
@@ -726,21 +726,21 @@ fn on_board_down(event: map<string>) -> null {
 fn on_board_up(event: map<string>) -> null {
     let mut game = &mut state;
     let current_revealed = &revealed;
-    let pointer_index = board_index_at(parse_positive_int(event.x.copy()), parse_positive_int(event.y.copy()), game.rows.copy(), game.columns.copy());
-    let pointer_button: string = event.button.copy();
-    if pointer_button == "Left" && pointer_index == game.pressed_index.copy() {
+    let pointer_index = board_index_at(parse_positive_int(event.x), parse_positive_int(event.y), (&game).rows, (&game).columns);
+    let pointer_button: string = event.button;
+    if pointer_button == "Left" && pointer_index == (&game).pressed_index {
         let _cell_opened = open_cell(pointer_index);
     }
     if pointer_button == "Right" {
-        if pointer_index >= 0 && game.active.copy() && !game.paused.copy() && current_revealed[pointer_index].copy() == 0 {
-            if flagged[pointer_index].copy() == 0 {
+        if pointer_index >= 0 && (&game).active && !(&game).paused && (&current_revealed)[pointer_index] == 0 {
+            if (&flagged)[pointer_index] == 0 {
                 flagged[pointer_index] = 1;
-                game.flag_count = game.flag_count.copy() + 1;
+                game.flag_count = (&game).flag_count + 1;
                 display[pointer_index] = 1;
             } else {
-                if flagged[pointer_index].copy() == 1 {
-                    game.flag_count = game.flag_count.copy() - 1;
-                    if game.marks_enabled.copy() {
+                if (&flagged)[pointer_index] == 1 {
+                    game.flag_count = (&game).flag_count - 1;
+                    if (&game).marks_enabled {
                         flagged[pointer_index] = 2;
                         display[pointer_index] = 14;
                     } else {
@@ -752,13 +752,13 @@ fn on_board_up(event: map<string>) -> null {
                     display[pointer_index] = 0;
                 }
             }
-            Visuals::SetSpriteText(mine_counter, format_counter(game.mine_total.copy() - game.flag_count.copy()));
+            Visuals::SetSpriteText(mine_counter, format_counter((&game).mine_total - (&game).flag_count));
         }
     }
-    if game.pressed_index.copy() >= 0 {
+    if (&game).pressed_index >= 0 {
         game.pressed_index = -1;
     }
-    let _board_rendered = render_board(game.rows.copy(), game.columns.copy(), game.paused.copy(), game.flash_until.copy(), game.pressed_index.copy());
+    let _board_rendered = render_board((&game).rows, (&game).columns, (&game).paused, (&game).flash_until, (&game).pressed_index);
     null
 }
 fn on_board_double_click(event: map<string>) -> null {
@@ -766,15 +766,15 @@ fn on_board_double_click(event: map<string>) -> null {
     let current_revealed = &revealed;
     let current_flagged = &flagged;
     let current_display = &display;
-    if event.button.copy() == "Left" {
-        let chord_index = board_index_at(parse_positive_int(event.x.copy()), parse_positive_int(event.y.copy()), game.rows.copy(), game.columns.copy());
-        if chord_index >= 0 && game.active.copy() && !game.paused.copy() && current_revealed[chord_index].copy() == 1 {
-            let chord_number = current_display[chord_index].copy() - 2;
+    if event.button == "Left" {
+        let chord_index = board_index_at(parse_positive_int(event.x), parse_positive_int(event.y), (&game).rows, (&game).columns);
+        if chord_index >= 0 && (&game).active && !(&game).paused && (&current_revealed)[chord_index] == 1 {
+            let chord_number = (&current_display)[chord_index] - 2;
             if chord_number >= 0 && chord_number <= 8 {
-                let chord_row = chord_index / game.columns.copy();
-                let chord_column = chord_index % game.columns.copy();
+                let chord_row = chord_index / (&game).columns;
+                let chord_column = chord_index % (&game).columns;
                 let mut adjacent_flags = 0;
-                flash_cells = new_board_array(game.rows.copy() * game.columns.copy());
+                flash_cells = new_board_array((&game).rows * (&game).columns);
                 let mut flash_count = 0;
                 let mut row_delta = -1;
                 while row_delta <= 1 {
@@ -783,13 +783,13 @@ fn on_board_double_click(event: map<string>) -> null {
                         let neighbor_row = chord_row + row_delta;
                         let neighbor_column = chord_column + column_delta;
                         if (row_delta != 0 || column_delta != 0) &&
-                           neighbor_row >= 0 && neighbor_row < game.rows.copy() &&
-                           neighbor_column >= 0 && neighbor_column < game.columns.copy() {
-                            let neighbor = neighbor_row * game.columns.copy() + neighbor_column;
-                            if current_flagged[neighbor].copy() == 1 {
+                           neighbor_row >= 0 && neighbor_row < (&game).rows &&
+                           neighbor_column >= 0 && neighbor_column < (&game).columns {
+                            let neighbor = neighbor_row * (&game).columns + neighbor_column;
+                            if (&current_flagged)[neighbor] == 1 {
                                 adjacent_flags = adjacent_flags + 1;
                             }
-                            if current_revealed[neighbor].copy() == 0 && current_flagged[neighbor].copy() != 1 {
+                            if (&current_revealed)[neighbor] == 0 && (&current_flagged)[neighbor] != 1 {
                                 flash_cells[neighbor] = 1;
                                 flash_count = flash_count + 1;
                             }
@@ -805,15 +805,15 @@ fn on_board_double_click(event: map<string>) -> null {
 
                 if flash_count > 0 && adjacent_flags == chord_number {
                     let mut open_row_delta = -1;
-                    while open_row_delta <= 1 && game.active.copy() {
+                    while open_row_delta <= 1 && (&game).active {
                         let mut open_column_delta = -1;
-                        while open_column_delta <= 1 && game.active.copy() {
+                        while open_column_delta <= 1 && (&game).active {
                             let open_row = chord_row + open_row_delta;
                             let open_column = chord_column + open_column_delta;
                             if (open_row_delta != 0 || open_column_delta != 0) &&
-                               open_row >= 0 && open_row < game.rows.copy() &&
-                               open_column >= 0 && open_column < game.columns.copy() {
-                                let _cell_opened = open_cell(open_row * game.columns.copy() + open_column);
+                               open_row >= 0 && open_row < (&game).rows &&
+                               open_column >= 0 && open_column < (&game).columns {
+                                let _cell_opened = open_cell(open_row * (&game).columns + open_column);
                             }
                             open_column_delta = open_column_delta + 1;
                         }
@@ -822,15 +822,15 @@ fn on_board_double_click(event: map<string>) -> null {
                 }
             }
         }
-        let _board_rendered = render_board(game.rows.copy(), game.columns.copy(), game.paused.copy(), game.flash_until.copy(), game.pressed_index.copy());
+        let _board_rendered = render_board((&game).rows, (&game).columns, (&game).paused, (&game).flash_until, (&game).pressed_index);
     }
     null
 }
 fn on_board_leave(event: map<string>) -> null {
     let mut game = &mut state;
-    if game.pressed_index.copy() >= 0 {
+    if (&game).pressed_index >= 0 {
         game.pressed_index = -1;
-        let _board_rendered = render_board(game.rows.copy(), game.columns.copy(), game.paused.copy(), game.flash_until.copy(), game.pressed_index.copy());
+        let _board_rendered = render_board((&game).rows, (&game).columns, (&game).paused, (&game).flash_until, (&game).pressed_index);
     }
     null
 }
@@ -858,20 +858,20 @@ fn on_about() -> null {
 fn on_timer_tick() -> null {
     let mut game = &mut state;
     let mut board_changed = false;
-    if game.flash_until.copy() > 0 && MonotonicClock::GetMilliseconds() >= game.flash_until.copy() {
+    if (&game).flash_until > 0 && MonotonicClock::GetMilliseconds() >= (&game).flash_until {
         game.flash_until = 0;
-        flash_cells = new_board_array(game.rows.copy() * game.columns.copy());
+        flash_cells = new_board_array((&game).rows * (&game).columns);
         board_changed = true;
     }
-    if game.active.copy() && game.started.copy() && !game.paused.copy() {
-        let measured_elapsed = (MonotonicClock::GetMilliseconds() - game.started_at.copy() - game.paused_total.copy()) / 1000;
-        if measured_elapsed != game.elapsed.copy() {
+    if (&game).active && (&game).started && !(&game).paused {
+        let measured_elapsed = (MonotonicClock::GetMilliseconds() - (&game).started_at - (&game).paused_total) / 1000;
+        if measured_elapsed != (&game).elapsed {
             game.elapsed = measured_elapsed;
-            Visuals::SetSpriteText(time_counter, format_counter(game.elapsed.copy()));
+            Visuals::SetSpriteText(time_counter, format_counter((&game).elapsed));
         }
     }
     if board_changed {
-        let _board_rendered = render_board(game.rows.copy(), game.columns.copy(), game.paused.copy(), game.flash_until.copy(), game.pressed_index.copy());
+        let _board_rendered = render_board((&game).rows, (&game).columns, (&game).paused, (&game).flash_until, (&game).pressed_index);
     }
     null
 }

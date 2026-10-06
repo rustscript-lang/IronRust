@@ -101,9 +101,9 @@ fn on_new() -> null {
 fn on_open() -> null {
     if Ui::ShowDialog(form, open_dialog) == "OK" {
         let current_path = OpenFileDialog::GetOpenFileDialogFileName(open_dialog);
-        SaveFileDialog::SetSaveFileDialogFileName(save_dialog, current_path.copy());
-        RichTextBox::SetRichTextBoxText(editor, File::ReadAllText(current_path.copy()));
-        Form::SetFormText(form, current_path.copy() + " - RustScript Notepad");
+        SaveFileDialog::SetSaveFileDialogFileName(save_dialog, &current_path);
+        RichTextBox::SetRichTextBoxText(editor, File::ReadAllText(&current_path));
+        Form::SetFormText(form, (&current_path) + " - RustScript Notepad");
         ToolStripStatusLabel::SetToolStripStatusLabelText(status_label, "Opened " + current_path);
     }
     null
@@ -117,8 +117,8 @@ fn on_save() -> null {
         }
     }
     if current_path != "" {
-        File::WriteAllText(current_path.copy(), RichTextBox::GetRichTextBoxText(editor));
-        Form::SetFormText(form, current_path.copy() + " - RustScript Notepad");
+        File::WriteAllText(&current_path, RichTextBox::GetRichTextBoxText(editor));
+        Form::SetFormText(form, (&current_path) + " - RustScript Notepad");
         ToolStripStatusLabel::SetToolStripStatusLabelText(status_label, "Saved " + current_path);
     }
     null
@@ -127,8 +127,8 @@ fn on_save() -> null {
 fn on_save_as() -> null {
     if Ui::ShowDialog(form, save_dialog) == "OK" {
         let current_path = SaveFileDialog::GetSaveFileDialogFileName(save_dialog);
-        File::WriteAllText(current_path.copy(), RichTextBox::GetRichTextBoxText(editor));
-        Form::SetFormText(form, current_path.copy() + " - RustScript Notepad");
+        File::WriteAllText(&current_path, RichTextBox::GetRichTextBoxText(editor));
+        Form::SetFormText(form, (&current_path) + " - RustScript Notepad");
         ToolStripStatusLabel::SetToolStripStatusLabelText(status_label, "Saved " + current_path);
     }
     null

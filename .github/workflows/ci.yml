@@ -10,7 +10,10 @@ permissions:
 jobs:
   dotnet:
     name: .NET build and tests
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - name: Setup .NET
@@ -29,11 +32,14 @@ jobs:
         run: cargo build --locked --release --all-targets --all-features --manifest-path native/pd-vm-compiler/Cargo.toml
       - name: Test native compiler
         run: cargo test --locked --release --all-targets --all-features --manifest-path native/pd-vm-compiler/Cargo.toml -- --test-threads=1
+      - name: Select native compiler library
+        shell: pwsh
+        run: |
+          $nativeName = if ($IsWindows) { 'pd_vm_compiler.dll' } else { 'libpd_vm_compiler.so' }
+          "PDVM_NATIVE_COMPILER=$env:GITHUB_WORKSPACE/native/pd-vm-compiler/target/release/$nativeName" >> $env:GITHUB_ENV
       - name: Restore
         run: dotnet restore IronRust.sln
       - name: Build
         run: dotnet build IronRust.sln --no-restore --configuration Release
       - name: Tests
-        env:
-          PDVM_NATIVE_COMPILER: ${{ github.workspace }}/native/pd-vm-compiler/target/release/libpd_vm_compiler.so
         run: dotnet test IronRust.sln --no-build --configuration Release --verbosity normal

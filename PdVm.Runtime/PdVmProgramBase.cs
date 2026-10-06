@@ -369,7 +369,12 @@ public abstract class PdVmProgramBase : IPdVmCallableProgram
         if (_mutableBorrowAliases.TryGetValue(absolute, out var aliasCell))
         {
             _lastBorrowedCapture = null;
-            return aliasCell.Value;
+            // A reused alias slot can hold a scalar temporary while Set is
+            // staged. Read that temporary until the slot contains a container
+            // again, rather than substituting the captured map or array.
+            return _locals[absolute].Kind is PdVmValueKind.Map or PdVmValueKind.Array
+                ? aliasCell.Value
+                : _locals[absolute];
         }
 
         if (_captureCells.TryGetValue(absolute, out var cell))

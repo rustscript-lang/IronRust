@@ -1040,6 +1040,28 @@ public sealed class PdVmTypedDotNetInteropTests
     }
 
     [Fact]
+    public void BorrowedStringSurvivesClrCallsAndConcatenationUntilItsFinalMove()
+    {
+        using var fixture = new SourceFixture(string.Empty);
+        var path = Path.Combine(fixture.Root, "borrowed.txt").Replace('\\', '/');
+        File.WriteAllText(fixture.SourcePath, $$"""
+            use System::IO::File;
+            let path = "{{path}}";
+            File::WriteAllText(&path, "document");
+            let text = File::ReadAllText(&path);
+            let title = (&path) + " - RustScript Notepad";
+            File::WriteAllText(path, text + title);
+            """);
+        var output = PdVmDotNetSourceCompiler.CompileFile(fixture.SourcePath, fixture.OutputPath);
+        var program = PdVmAssemblyLoader.CreateProgram(Assembly.Load(File.ReadAllBytes(output)));
+        var host = PdVmDefaultHost.CreateConsoleHost();
+        host.RegisterFallback(new PdVmDotNetHost().Call);
+
+        Assert.Equal(PdVmStatusKind.Halted, PdVmExecution.Run(program, host).Status.Kind);
+        Assert.Equal("document" + path + " - RustScript Notepad", File.ReadAllText(path));
+    }
+
+    [Fact]
     public void SourceWrapperCompilesRustScriptMinesweeperWithEmbeddedBitmaps()
     {
         if (!OperatingSystem.IsWindows())
