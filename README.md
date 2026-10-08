@@ -23,7 +23,7 @@ On Windows, launch the Minesweeper example with:
 .\run-minesweeper.bat
 ```
 
-![Minesweeper running on the CLR](docs/images/minesweeper.jpg)
+![Minesweeper running on the CLR](docs/images/minesweeper.png)
 
 Run the native compiler and CLR tests with:
 
