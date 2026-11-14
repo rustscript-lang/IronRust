@@ -410,6 +410,8 @@ fn write_host_type_schema(
     match schema {
         HostTypeSchema::Unknown => out.push(0),
         HostTypeSchema::Null => out.push(1),
+        // Guest `()`; distinct from Null but shares the internal Null carrier.
+        HostTypeSchema::Unit => out.push(16),
         HostTypeSchema::Int => out.push(2),
         HostTypeSchema::Float => out.push(3),
         HostTypeSchema::Number => out.push(4),
@@ -449,6 +451,15 @@ fn write_host_type_schema(
                 write_host_type_schema(&field.ty, out, next_host_schema_depth(depth)?)?;
             }
         }
+        HostTypeSchema::Result { ok, err } => {
+            out.push(14);
+            write_host_type_schema(ok, out, next_host_schema_depth(depth)?)?;
+            write_host_type_schema(err, out, next_host_schema_depth(depth)?)?;
+        }
+        HostTypeSchema::Option(inner) => {
+            out.push(15);
+            write_host_type_schema(inner, out, next_host_schema_depth(depth)?)?;
+        }
     }
     Ok(())
 }
@@ -464,6 +475,8 @@ fn write_schema(schema: &TypeSchema, out: &mut Vec<u8>) -> Result<(), WireError>
     match schema {
         TypeSchema::Unknown => out.push(0),
         TypeSchema::Null => out.push(1),
+        // Guest `()`; distinct from Null but shares the internal Null carrier.
+        TypeSchema::Unit => out.push(20),
         TypeSchema::Int => out.push(2),
         TypeSchema::Float => out.push(3),
         TypeSchema::Number => out.push(4),
@@ -472,6 +485,10 @@ fn write_schema(schema: &TypeSchema, out: &mut Vec<u8>) -> Result<(), WireError>
         TypeSchema::Bytes => out.push(7),
         TypeSchema::Optional(inner) => {
             out.push(16);
+            write_schema(inner, out)?;
+        }
+        TypeSchema::Option(inner) => {
+            out.push(19);
             write_schema(inner, out)?;
         }
         TypeSchema::GenericParam(name) => {
@@ -530,6 +547,11 @@ fn write_schema(schema: &TypeSchema, out: &mut Vec<u8>) -> Result<(), WireError>
         TypeSchema::Resource(key) => {
             out.push(17);
             write_string("schema resource key", key.as_str(), out)?;
+        }
+        TypeSchema::Result { ok, err } => {
+            out.push(18);
+            write_schema(ok, out)?;
+            write_schema(err, out)?;
         }
     }
     Ok(())
