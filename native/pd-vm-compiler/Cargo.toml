@@ -10,7 +10,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 # ABI declarations only: none of these features includes a protocol implementation.
-edge = { package = "pd-edge-abi", git = "https://github.com/rustscript-lang/pd-edge.git", rev = "1ab0decfce82d5dbeedad36218a5648dd8864527", default-features = false, features = ["console", "http", "tls", "websocket"] }
+edge = { package = "pd-edge-abi", git = "https://github.com/rustscript-lang/pd-edge.git", rev = "33c3bcd7002aa2b527455690680a070a1084bccc", default-features = false, features = ["console", "http", "tls", "websocket"] }
 vm = { package = "pd-vm", git = "https://github.com/rustscript-lang/rustscript.git", rev = "8db4583298cce9806d617322606537e6344c8b6e", default-features = false }
 
 [dev-dependencies]
