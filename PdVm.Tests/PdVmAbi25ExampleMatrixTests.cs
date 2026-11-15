@@ -50,7 +50,7 @@ public sealed class PdVmAbi25ExampleMatrixTests
 
             var bytes = PdVmNativeCompiler.CompileFile(path);
             Assert.True(bytes.AsSpan(0, 4).SequenceEqual("VMBC"u8));
-            Assert.Equal((ushort)13, BitConverter.ToUInt16(bytes, 4));
+            Assert.Equal((ushort)14, BitConverter.ToUInt16(bytes, 4));
             var model = PdVmVmbcReader.ReadBytes(bytes);
             Assert.NotEmpty(model.Code);
             if (source.Contains("http::", StringComparison.Ordinal) ||

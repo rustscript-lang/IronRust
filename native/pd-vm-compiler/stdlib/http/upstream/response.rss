@@ -10,7 +10,7 @@ pub fn get_status() -> int {
     http::exchange::get_status(upstream_response_default_exchange())
 }
 
-pub fn get_header(name: string) -> string {
+pub fn get_header(name: string) -> Result<Option<string>, string> {
     http::exchange::get_header(upstream_response_default_exchange(), name)
 }
 

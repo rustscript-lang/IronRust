@@ -8,7 +8,7 @@ public static class PdVmVmbcReader
     private const int MaximumConstantDepth = 64;
     private static readonly byte[] Magic = "VMBC"u8.ToArray();
 
-    private const ushort Version = 13;
+    private const ushort Version = 14;
     private const ushort Flags = 0;
 
     public static PdVmProgramModel ReadFile(string path)
@@ -84,6 +84,10 @@ public static class PdVmVmbcReader
         SkipDebugInfo(ref cursor);
         var callableMetadata = ReadCallableMetadata(ref cursor);
         var namedStructDecls = ReadNamedStructDecls(ref cursor);
+        if (cursor.ReadUInt32() != 0)
+        {
+            throw new PdVmCompilerException("non-empty return cleanup metadata is not supported");
+        }
 
         if (!cursor.IsEof)
         {
@@ -462,6 +466,11 @@ public static class PdVmVmbcReader
                 items: ReadSchemaList(ref cursor),
                 result: ReadSchema(ref cursor)),
             16 => new PdVmTypeSchema(PdVmTypeSchemaKind.Optional, element: ReadSchema(ref cursor)),
+            18 => new PdVmTypeSchema(
+                PdVmTypeSchemaKind.Result,
+                items: [ReadSchema(ref cursor), ReadSchema(ref cursor)]),
+            19 => new PdVmTypeSchema(PdVmTypeSchemaKind.Option, element: ReadSchema(ref cursor)),
+            20 => new PdVmTypeSchema(PdVmTypeSchemaKind.Unit),
             _ => throw new PdVmCompilerException($"invalid schema tag {kind} in VMBC payload"),
         };
     }
@@ -697,6 +706,13 @@ public static class PdVmVmbcReader
             11 => ReadHostCallableSchema(ref cursor, depth),
             12 => new PdVmHostTypeSchema(PdVmHostTypeSchemaKind.Resource, name: cursor.ReadString()),
             13 => ReadHostNamedSchema(ref cursor, depth),
+            14 => new PdVmHostTypeSchema(
+                PdVmHostTypeSchemaKind.Result,
+                items: [ReadHostTypeSchema(ref cursor, depth + 1), ReadHostTypeSchema(ref cursor, depth + 1)]),
+            15 => new PdVmHostTypeSchema(
+                PdVmHostTypeSchemaKind.Option,
+                element: ReadHostTypeSchema(ref cursor, depth + 1)),
+            16 => new PdVmHostTypeSchema(PdVmHostTypeSchemaKind.Unit),
             var tag => throw new PdVmCompilerException($"invalid host schema tag {tag}"),
         };
     }

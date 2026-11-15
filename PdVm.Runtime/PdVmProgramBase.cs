@@ -1255,7 +1255,7 @@ public abstract class PdVmProgramBase : IPdVmCallableProgram
 
         return schema.Kind switch
         {
-            PdVmRuntimeTypeSchemaKind.Null => declaredType == PdVmValueType.Null,
+            PdVmRuntimeTypeSchemaKind.Null or PdVmRuntimeTypeSchemaKind.Unit => declaredType == PdVmValueType.Null,
             PdVmRuntimeTypeSchemaKind.Int => declaredType == PdVmValueType.Int,
             PdVmRuntimeTypeSchemaKind.Float => declaredType == PdVmValueType.Float,
             PdVmRuntimeTypeSchemaKind.Number => declaredType is PdVmValueType.Int or PdVmValueType.Float,
@@ -1279,7 +1279,7 @@ public abstract class PdVmProgramBase : IPdVmCallableProgram
         return schema.Kind switch
         {
             PdVmRuntimeTypeSchemaKind.Unknown or PdVmRuntimeTypeSchemaKind.GenericParameter => true,
-            PdVmRuntimeTypeSchemaKind.Null => value.Kind == PdVmValueKind.Null,
+            PdVmRuntimeTypeSchemaKind.Null or PdVmRuntimeTypeSchemaKind.Unit => value.Kind == PdVmValueKind.Null,
             PdVmRuntimeTypeSchemaKind.Int => value.Kind == PdVmValueKind.Int,
             PdVmRuntimeTypeSchemaKind.Float => value.Kind == PdVmValueKind.Float,
             PdVmRuntimeTypeSchemaKind.Number => value.Kind is PdVmValueKind.Int or PdVmValueKind.Float,

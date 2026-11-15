@@ -1,5 +1,5 @@
-//! Compiler-only projection of the frozen pd-edge ABI25 declarations.
-//! Schema projection and stdlib overlays follow pd-edge 5f4f889
+//! Compiler-only projection of the frozen pd-edge ABI26 declarations.
+//! Schema projection and stdlib overlays follow pd-edge 1ab0dec
 //! (see LICENSE.pd-edge); there are no protocol handlers or VM adapters.
 use edge::{AbiParamType, AbiValueType};
 use std::path::Path;
@@ -27,7 +27,7 @@ fn edge_param_type_schema(param: AbiParamType) -> HostTypeSchema {
 fn edge_return_type_schema(value: AbiValueType) -> HostTypeSchema {
     match value {
         AbiValueType::Unknown => HostTypeSchema::Unknown,
-        AbiValueType::Null => HostTypeSchema::Null,
+        AbiValueType::Unit => HostTypeSchema::Unit,
         AbiValueType::Int => HostTypeSchema::Int,
         AbiValueType::Float => HostTypeSchema::Float,
         AbiValueType::Bool => HostTypeSchema::Bool,
@@ -35,6 +35,10 @@ fn edge_return_type_schema(value: AbiValueType) -> HostTypeSchema {
         AbiValueType::Bytes => HostTypeSchema::Bytes,
         AbiValueType::Array => HostTypeSchema::Array(Box::new(HostTypeSchema::Unknown)),
         AbiValueType::Map => HostTypeSchema::Map(Box::new(HostTypeSchema::Unknown)),
+        AbiValueType::ResultOptionString => HostTypeSchema::Result {
+            ok: Box::new(HostTypeSchema::Option(Box::new(HostTypeSchema::String))),
+            err: Box::new(HostTypeSchema::String),
+        },
     }
 }
 
@@ -45,31 +49,28 @@ fn mqtt_event_schema() -> HostTypeSchema {
             HostStructField::new("kind", HostTypeSchema::String),
             HostStructField::new(
                 "topic",
-                HostTypeSchema::Optional(Box::new(HostTypeSchema::String)),
+                HostTypeSchema::Option(Box::new(HostTypeSchema::String)),
             ),
             HostStructField::new(
                 "payload_text",
-                HostTypeSchema::Optional(Box::new(HostTypeSchema::String)),
+                HostTypeSchema::Option(Box::new(HostTypeSchema::String)),
             ),
             HostStructField::new(
                 "payload_base64",
-                HostTypeSchema::Optional(Box::new(HostTypeSchema::String)),
+                HostTypeSchema::Option(Box::new(HostTypeSchema::String)),
             ),
-            HostStructField::new(
-                "qos",
-                HostTypeSchema::Optional(Box::new(HostTypeSchema::Int)),
-            ),
+            HostStructField::new("qos", HostTypeSchema::Option(Box::new(HostTypeSchema::Int))),
             HostStructField::new(
                 "retain",
-                HostTypeSchema::Optional(Box::new(HostTypeSchema::Bool)),
+                HostTypeSchema::Option(Box::new(HostTypeSchema::Bool)),
             ),
             HostStructField::new(
                 "dup",
-                HostTypeSchema::Optional(Box::new(HostTypeSchema::Bool)),
+                HostTypeSchema::Option(Box::new(HostTypeSchema::Bool)),
             ),
             HostStructField::new(
                 "reason",
-                HostTypeSchema::Optional(Box::new(HostTypeSchema::String)),
+                HostTypeSchema::Option(Box::new(HostTypeSchema::String)),
             ),
         ],
     )

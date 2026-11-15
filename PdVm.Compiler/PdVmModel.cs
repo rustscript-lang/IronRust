@@ -65,6 +65,9 @@ public enum PdVmTypeSchemaKind : byte
     Object = 14,
     Callable = 15,
     Optional = 16,
+    Result = 18,
+    Option = 19,
+    Unit = 20,
 }
 
 public sealed record PdVmTypeSchema
@@ -198,6 +201,9 @@ public enum PdVmHostTypeSchemaKind : byte
     Callable = 11,
     Resource = 12,
     Named = 13,
+    Result = 14,
+    Option = 15,
+    Unit = 16,
 }
 
 public sealed record PdVmHostImportParam(
