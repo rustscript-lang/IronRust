@@ -10,9 +10,9 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 # ABI declarations only: none of these features includes a protocol implementation.
-edge = { package = "pd-edge-abi", git = "https://github.com/rustscript-lang/pd-edge.git", rev = "33c3bcd7002aa2b527455690680a070a1084bccc", default-features = false, features = ["console", "http", "tls", "websocket"] }
-vm = { package = "pd-vm", git = "https://github.com/rustscript-lang/rustscript.git", rev = "8db4583298cce9806d617322606537e6344c8b6e", default-features = false }
+edge = { package = "pd-edge-abi", git = "https://github.com/rustscript-lang/pd-edge.git", rev = "a0f3aacc1209276e7f158f1061848169abea925c", default-features = false, features = ["console", "http", "tls", "websocket"] }
+vm = { package = "pd-vm", git = "https://github.com/rustscript-lang/rustscript.git", rev = "2f433edab3f1907e8cb060e901357d7e2af016ce", default-features = false }
 
 [dev-dependencies]
 # Execute parity fixtures with the runtime in tests only.
-vm = { package = "pd-vm", git = "https://github.com/rustscript-lang/rustscript.git", rev = "8db4583298cce9806d617322606537e6344c8b6e", default-features = false, features = ["runtime"] }
+vm = { package = "pd-vm", git = "https://github.com/rustscript-lang/rustscript.git", rev = "2f433edab3f1907e8cb060e901357d7e2af016ce", default-features = false, features = ["runtime"] }
