@@ -4,8 +4,8 @@ use proxy;
 let downstream_version = http::request::get_http_version();
 let request_body_mode = match http::request::get_header("x-bench-body-mode") {
     Result::Ok(present) => match present {
-        Option::Some(text) => text,
-        Option::None => "",
+        Some(text) => text,
+        None => "",
     },
     Result::Err(error) => "",
 };
