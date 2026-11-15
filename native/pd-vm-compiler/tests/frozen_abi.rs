@@ -9,7 +9,7 @@ use pd_vm_compiler::compile_edge_source_file;
 
 const FROZEN_CORE_REV: &str = "2f433edab3f1907e8cb060e901357d7e2af016ce";
 const FROZEN_CORE_URL: &str = "https://github.com/rustscript-lang/rustscript.git";
-const FROZEN_EDGE_REV: &str = "a0f3aacc1209276e7f158f1061848169abea925c";
+const FROZEN_EDGE_REV: &str = "9a9ee3303a17fcf65893f04b1ce4e4df9d7f50c1";
 const FROZEN_EDGE_URL: &str = "https://github.com/rustscript-lang/pd-edge.git";
 const FROZEN_EDGE_ABI: u16 = 26;
 const EXPECTED_EXAMPLES: usize = 7;

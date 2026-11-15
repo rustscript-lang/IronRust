@@ -65,7 +65,7 @@ checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 [[package]]
 name = "pd-edge-abi"
 version = "0.1.0"
-source = "git+https://github.com/rustscript-lang/pd-edge.git?rev=a0f3aacc1209276e7f158f1061848169abea925c#a0f3aacc1209276e7f158f1061848169abea925c"
+source = "git+https://github.com/rustscript-lang/pd-edge.git?rev=9a9ee3303a17fcf65893f04b1ce4e4df9d7f50c1#9a9ee3303a17fcf65893f04b1ce4e4df9d7f50c1"
 dependencies = [
  "pd-host-function",
  "pd-vm",
