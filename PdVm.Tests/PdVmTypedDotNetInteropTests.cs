@@ -106,7 +106,7 @@ public sealed class PdVmTypedDotNetInteropTests
     [Fact]
     public void ShutdownInvalidatesCallableAndCallbackHandles()
     {
-        using var fixture = new SourceFixture("pub fn on_click() -> null { null }\n");
+        using var fixture = new SourceFixture("pub fn on_click() -> () { () }\n");
         var output = PdVmDotNetSourceCompiler.CompileFile(fixture.SourcePath, fixture.OutputPath);
         var program = Assert.IsAssignableFrom<IPdVmCallableProgram>(
             PdVmAssemblyLoader.CreateProgram(Assembly.Load(File.ReadAllBytes(output))));
@@ -209,10 +209,10 @@ public sealed class PdVmTypedDotNetInteropTests
     {
         using var fixture = new SourceFixture(
             "let mut state: map<int> = { value: 0 };\n" +
-            "fn update_state() -> null {\n" +
+            "fn update_state() -> () {\n" +
             "    let mut current = &mut state;\n" +
             "    current.value = current.value + 1;\n" +
-            "    null\n" +
+            "    ()\n" +
             "}\n" +
             "pub fn read_after_update() -> int {\n" +
             "    let mut current = &mut state;\n" +
@@ -295,7 +295,7 @@ public sealed class PdVmTypedDotNetInteropTests
     [Fact]
     public async Task EventHandlerPostsCallableOutsideTheEventStack()
     {
-        using var fixture = new SourceFixture("pub fn on_click() -> null { null }\n");
+        using var fixture = new SourceFixture("pub fn on_click() -> () { () }\n");
         var output = PdVmDotNetSourceCompiler.CompileFile(fixture.SourcePath, fixture.OutputPath);
         var program = Assert.IsAssignableFrom<IPdVmCallableProgram>(
             PdVmAssemblyLoader.CreateProgram(Assembly.Load(File.ReadAllBytes(output))));
@@ -514,6 +514,14 @@ public sealed class PdVmTypedDotNetInteropTests
         _ = PdVmExecution.Run(program, PdVmDefaultHost.CreateConsoleHost());
 
         Assert.Equal([41L, 42L, 3L], program.Stack.Select(value => value.AsInt()));
+
+        using var keyFixture = new SourceFixture("fn key() -> int { 1 }\nkey;\n");
+        var keyOutput = PdVmDotNetSourceCompiler.CompileFile(keyFixture.SourcePath, keyFixture.OutputPath);
+        var keyProgram = PdVmAssemblyLoader.CreateProgram(Assembly.Load(File.ReadAllBytes(keyOutput)));
+        _ = PdVmExecution.Run(keyProgram, PdVmDefaultHost.CreateConsoleHost());
+        var callableKey = Assert.Single(keyProgram.Stack);
+        Assert.Throws<InvalidOperationException>(() => PdVmBuiltins.MapEditValue(
+            PdVmBuiltins.MapNewValue(), callableKey, PdVmValue.Null(), PdVmValue.FromBool(false)));
     }
 
     [Fact]
@@ -537,11 +545,11 @@ public sealed class PdVmTypedDotNetInteropTests
     }
 
     [Fact]
-    public void ExplicitSetNullDeletesMapEntryThroughGeneratedClr()
+    public void ExplicitRemoveDeletesMapEntryThroughGeneratedClr()
     {
         using var fixture = new SourceFixture(
-            "let mut values = { key: 1, drop: 2 };\n" +
-            "values[\"drop\"] = null;\n" +
+            "let mut values: map<int> = { key: 1, drop: 2 };\n" +
+            "values = values.remove(\"drop\");\n" +
             "[values.has(\"drop\"), values.has(\"key\"), values.key];\n");
         var output = PdVmDotNetSourceCompiler.CompileFile(fixture.SourcePath, fixture.OutputPath);
         var program = PdVmAssemblyLoader.CreateProgram(Assembly.Load(File.ReadAllBytes(output)));
@@ -554,6 +562,22 @@ public sealed class PdVmTypedDotNetInteropTests
             Assert.Single(program.Stack).AsArray().Select(value => value.Kind == PdVmValueKind.Bool
                 ? (value.AsBool() ? 1L : 0L)
                 : value.AsInt()));
+
+        using var unitFixture = new SourceFixture(
+            "let mut values: map<()> = {};\n" +
+            "values[\"unit\"] = ();\n" +
+            "[values.has(\"unit\"), values.length];\n" +
+            "values = values.remove(\"unit\");\n" +
+            "[values.has(\"unit\"), values.length];\n");
+        var unitOutput = PdVmDotNetSourceCompiler.CompileFile(unitFixture.SourcePath, unitFixture.OutputPath);
+        var unitProgram = PdVmAssemblyLoader.CreateProgram(Assembly.Load(File.ReadAllBytes(unitOutput)));
+        Assert.Equal(PdVmStatusKind.Halted, PdVmExecution.Run(unitProgram, PdVmDefaultHost.CreateConsoleHost()).Status.Kind);
+        var before = unitProgram.Stack[0].AsArray();
+        var after = unitProgram.Stack[1].AsArray();
+        Assert.True(before[0].AsBool());
+        Assert.Equal(1, before[1].AsInt());
+        Assert.False(after[0].AsBool());
+        Assert.Equal(0, after[1].AsInt());
     }
 
     [Fact]
@@ -674,8 +698,8 @@ public sealed class PdVmTypedDotNetInteropTests
     public async Task PendingHostCallableValueNormalizesUnitResult()
     {
         using var fixture = new SourceFixture(
-            "fn delayed() -> null;\n" +
-            "let function: fn() -> null = delayed;\n" +
+            "fn delayed() -> ();\n" +
+            "let function: fn() -> () = delayed;\n" +
             "function();\n");
         var output = PdVmDotNetSourceCompiler.CompileFile(fixture.SourcePath, fixture.OutputPath);
         var program = PdVmAssemblyLoader.CreateProgram(Assembly.Load(File.ReadAllBytes(output)));

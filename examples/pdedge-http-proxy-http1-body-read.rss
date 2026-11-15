@@ -2,7 +2,13 @@ use http;
 use proxy;
 
 let downstream_version = http::request::get_http_version();
-let request_body_mode = http::request::get_header("x-bench-body-mode");
+let request_body_mode = match http::request::get_header("x-bench-body-mode") {
+    Result::Ok(present) => match present {
+        Option::Some(text) => text,
+        Option::None => "",
+    },
+    Result::Err(error) => "",
+};
 let upstream = http::exchange::default_upstream();
 http::exchange::set_target(upstream, "127.0.0.1", 18080);
 http::exchange::set_header(upstream, "x-downstream-version", downstream_version);

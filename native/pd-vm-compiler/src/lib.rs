@@ -7,14 +7,13 @@ mod catalog;
 pub use catalog::compile_edge_source_file;
 
 mod vmbc;
-mod wire;
 
 const STATUS_OK: i32 = 0;
 const STATUS_COMPILE_ERROR: i32 = 1;
 const STATUS_INVALID_ARGUMENT: i32 = 2;
 const STATUS_PANIC: i32 = 3;
 
-const FROZEN_EDGE_ABI: u16 = 25;
+const FROZEN_EDGE_ABI: u16 = 26;
 
 #[unsafe(no_mangle)]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
@@ -193,11 +192,11 @@ mod tests {
     }
 
     #[test]
-    fn frozen_edge_abi_is_version_25() {
+    fn frozen_edge_abi_is_version_26() {
         assert_eq!(ABI_VERSION, FROZEN_EDGE_ABI);
         assert!(
-            edge::abi_json().contains("\"abi_version\": 25"),
-            "published edge ABI JSON must record version 25"
+            edge::abi_json().contains("\"abi_version\": 26"),
+            "published edge ABI JSON must record version 26"
         );
     }
 

@@ -481,7 +481,7 @@ public static class PdVmDotNetSourceCompiler
                     property.Name,
                     [property.PropertyType],
                     [new Parameter("handle", "int"), new Parameter("value", setSchema)],
-                    "null"));
+                    "()"));
             }
         }
 
@@ -536,7 +536,7 @@ public static class PdVmDotNetSourceCompiler
 
     private static bool TryGetSchema(Type type, out string schema)
     {
-        if (type == typeof(void)) { schema = "null"; return true; }
+        if (type == typeof(void)) { schema = "()"; return true; }
         if (type == typeof(string) || type == typeof(char) || type.IsEnum) { schema = "string"; return true; }
         if (type == typeof(bool)) { schema = "bool"; return true; }
         if (type == typeof(byte[])) { schema = "bytes"; return true; }

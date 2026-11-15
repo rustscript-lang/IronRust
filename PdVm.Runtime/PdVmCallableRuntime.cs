@@ -43,6 +43,9 @@ public enum PdVmRuntimeTypeSchemaKind : byte
     Object = 14,
     Callable = 15,
     Optional = 16,
+    Result = 18,
+    Option = 19,
+    Unit = 20,
 }
 
 public sealed record PdVmRuntimeTypeSchema(

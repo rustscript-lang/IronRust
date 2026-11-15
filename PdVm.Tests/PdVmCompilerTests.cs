@@ -64,7 +64,80 @@ public sealed class PdVmCompilerTests
     }
 
     [Fact]
-    public void ReadsV13CallableMetadataAndExportSchema()
+    public void ReadsV14WithEmptyReturnCleanupSection()
+    {
+        var payload = EncodeVmbc([], [(byte)PdVmBytecodeOpCode.Ret], []);
+
+        var model = PdVmVmbcReader.ReadBytes(payload);
+
+        Assert.Single(model.Instructions);
+    }
+
+    [Fact]
+    public void RejectsNonEmptyOrTruncatedReturnCleanupMetadata()
+    {
+        var payload = EncodeVmbc([], [(byte)PdVmBytecodeOpCode.Ret], []);
+        payload[^4] = 1;
+        var error = Assert.Throws<PdVmCompilerException>(() => PdVmVmbcReader.ReadBytes(payload));
+        Assert.Contains("non-empty return cleanup", error.Message);
+        var truncated = payload[..^1];
+        Assert.Throws<PdVmCompilerException>(() => PdVmVmbcReader.ReadBytes(truncated));
+    }
+
+    [Fact]
+    public void ReadsV14ResultOptionAndUnitSchemaTags()
+    {
+        using var stream = new MemoryStream();
+        using var writer = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true);
+        writer.Write("VMBC"u8.ToArray());
+        writer.Write((ushort)14);
+        writer.Write((ushort)0);
+        writer.Write((uint)0); // constants
+        writer.Write((uint)1);
+        writer.Write((byte)PdVmBytecodeOpCode.Ret);
+        writer.Write((uint)1); // imports
+        WriteString(writer, "test");
+        writer.Write((byte)0); // arity
+        writer.Write((byte)PdVmValueType.Null);
+        writer.Write((byte)1); // host schema present
+        WriteString(writer, "test");
+        writer.Write((uint)0); // parameters
+        writer.Write((byte)14); // Result
+        writer.Write((byte)15); // Option
+        writer.Write((byte)16); // Unit
+        writer.Write((byte)2); // Int
+        writer.Write((ulong)1); // fingerprint
+        writer.Write((byte)1); // type map
+        writer.Write((byte)1); // strict
+        writer.Write((uint)1); // locals
+        writer.Write((byte)PdVmValueType.Map);
+        writer.Write((byte)1); // schema present
+        writer.Write((byte)18); // Result
+        writer.Write((byte)19); // Option
+        writer.Write((byte)20); // Unit
+        writer.Write((byte)2); // Int
+        writer.Write((uint)1); writer.Write((byte)0); // callable slots
+        writer.Write((uint)1); writer.Write((byte)0); // optional slots
+        writer.Write((uint)0); // operand types
+        writer.Write((byte)0); // debug
+        for (var index = 0; index < 7; index++) writer.Write((uint)0); // metadata
+        writer.Flush();
+
+        var model = PdVmVmbcReader.ReadBytes(stream.ToArray());
+        var host = Assert.Single(model.HostImportSchemas)!.ReturnType;
+        Assert.Equal(PdVmHostTypeSchemaKind.Result, host.Kind);
+        Assert.Equal(PdVmHostTypeSchemaKind.Option, host.Items[0].Kind);
+        Assert.Equal(PdVmHostTypeSchemaKind.Unit, host.Items[0].Element!.Kind);
+        Assert.Equal(PdVmHostTypeSchemaKind.Int, host.Items[1].Kind);
+        var schema = Assert.Single(model.TypeMap!.LocalSchemas)!;
+        Assert.Equal(PdVmTypeSchemaKind.Result, schema.Kind);
+        Assert.Equal(PdVmTypeSchemaKind.Option, schema.Items[0].Kind);
+        Assert.Equal(PdVmTypeSchemaKind.Unit, schema.Items[0].Element!.Kind);
+        Assert.Equal(PdVmTypeSchemaKind.Int, schema.Items[1].Kind);
+    }
+
+    [Fact]
+    public void ReadsV14CallableMetadataAndExportSchema()
     {
         var callableSchema = new PdVmTypeSchema(
             PdVmTypeSchemaKind.Callable,
@@ -533,7 +606,8 @@ public sealed class PdVmCompilerTests
     [InlineData(10)]
     [InlineData(11)]
     [InlineData(12)]
-    public void RejectsPreV13PayloadsWithPreciseVersion(int version)
+    [InlineData(13)]
+    public void RejectsPreV14PayloadsWithPreciseVersion(int version)
     {
         var payload = EncodeVmbc(
             Array.Empty<PdVmValue>(),
@@ -544,7 +618,7 @@ public sealed class PdVmCompilerTests
 
         var error = Assert.Throws<PdVmCompilerException>(() => PdVmVmbcReader.ReadBytes(payload));
 
-        Assert.Equal($"unsupported VMBC version {version}, expected 13", error.Message);
+        Assert.Equal($"unsupported VMBC version {version}, expected 14", error.Message);
     }
 
     [Fact]
@@ -590,7 +664,14 @@ public sealed class PdVmCompilerTests
             var index = PdVmBuiltins.GetCallIndex(builtin);
             Assert.True(PdVmBuiltins.TryGetBuiltin(index, out var decoded));
             Assert.Equal(builtin, decoded);
-            Assert.InRange(PdVmBuiltins.GetArity(builtin), (byte)0, (byte)3);
+            if (builtin == PdVmBuiltin.MapEdit)
+            {
+                Assert.Equal((byte)4, PdVmBuiltins.GetArity(builtin));
+            }
+            else
+            {
+                Assert.InRange(PdVmBuiltins.GetArity(builtin), (byte)0, (byte)3);
+            }
         }
 
         Assert.Equal(0xFFA2, PdVmBuiltins.BuiltinCallBase);
@@ -601,6 +682,7 @@ public sealed class PdVmCompilerTests
         Assert.Equal(0xFFFB, PdVmBuiltins.GetCallIndex(PdVmBuiltin.Count));
         Assert.Equal(0xFF94, PdVmBuiltins.GetCallIndex(PdVmBuiltin.BindCallable));
         Assert.Equal(0xFF93, PdVmBuiltins.GetCallIndex(PdVmBuiltin.DetachLocal));
+        Assert.Equal(0xFF8F, PdVmBuiltins.GetCallIndex(PdVmBuiltin.MapEdit));
     }
 
     [Fact]
@@ -1139,7 +1221,7 @@ public sealed class PdVmCompilerTests
         using var writer = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true);
 
         writer.Write("VMBC"u8.ToArray());
-        writer.Write((ushort)13);
+        writer.Write((ushort)14);
         writer.Write((ushort)0);
         writer.Write((uint)constants.Count);
         foreach (var constant in constants)
@@ -1172,7 +1254,8 @@ public sealed class PdVmCompilerTests
         {
             writeCallableMetadata(writer);
         }
-        writer.Write((uint)0);
+        writer.Write((uint)0); // named struct declarations
+        writer.Write((uint)0); // return cleanup metadata
         writer.Flush();
         return stream.ToArray();
     }

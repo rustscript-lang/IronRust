@@ -111,6 +111,7 @@ public enum PdVmBuiltin
     MapIterClose,
     BindCallable,
     DetachLocal,
+    MapEdit,
 }
 
 public static class PdVmBuiltins
@@ -138,6 +139,24 @@ public static class PdVmBuiltins
 
     public static PdVmValue SetValue(PdVmValue container, PdVmValue key, PdVmValue value) =>
         DispatchSet(new[] { container, key, value });
+
+    public static PdVmValue MapEditValue(PdVmValue container, PdVmValue key, PdVmValue value, PdVmValue remove)
+    {
+        if (key.Kind == PdVmValueKind.Callable)
+        {
+            throw new InvalidOperationException("callable values are not supported as map keys");
+        }
+        var output = container.AsMap().CloneMap();
+        if (remove.AsBool())
+        {
+            output.Remove(key);
+        }
+        else
+        {
+            output.Set(key, value);
+        }
+        return PdVmValue.FromMap(output);
+    }
 
     public static PdVmValue VacateMovedField(PdVmValue container, PdVmValue key, PdVmValue movedValue)
     {
@@ -330,6 +349,7 @@ public static class PdVmBuiltins
             PdVmBuiltin.MapIterClose => (ushort)(BuiltinCallBase - 13),
             PdVmBuiltin.BindCallable => (ushort)(BuiltinCallBase - 14),
             PdVmBuiltin.DetachLocal => (ushort)(BuiltinCallBase - 15),
+            PdVmBuiltin.MapEdit => 0xFF8F,
             _ when builtin <= PdVmBuiltin.Count => (ushort)(BuiltinCallBase + (ushort)builtin),
             _ => throw new ArgumentOutOfRangeException(nameof(builtin)),
         };
@@ -443,13 +463,14 @@ public static class PdVmBuiltins
                 or PdVmBuiltin.MathClamp
                 or PdVmBuiltin.MathMulAdd
                 or PdVmBuiltin.StringReplaceLiteral => 3,
+            PdVmBuiltin.MapEdit => 4,
             _ => throw new ArgumentOutOfRangeException(nameof(builtin)),
         };
     }
 
     public static bool IsBuiltinIndex(ushort callIndex)
     {
-        var specialStart = BuiltinCallBase - 15;
+        var specialStart = 0xFF8C;
         var mainEnd = BuiltinCallBase + BuiltinCallCount - 1;
         return callIndex >= specialStart && callIndex <= mainEnd;
     }
@@ -458,6 +479,9 @@ public static class PdVmBuiltins
     {
         switch (callIndex)
         {
+            case 0xFF8F:
+                builtin = PdVmBuiltin.MapEdit;
+                return true;
             case var index when index == BuiltinCallBase - 4:
                 builtin = PdVmBuiltin.FormatTemplate;
                 return true;
@@ -536,6 +560,7 @@ public static class PdVmBuiltins
             PdVmBuiltin.Get => ReturnOne(GetValue(GetArg(args, 0), GetArg(args, 1))),
             PdVmBuiltin.Has => ReturnOne(HasValue(GetArg(args, 0), GetArg(args, 1))),
             PdVmBuiltin.Set => ReturnOne(SetValue(GetArg(args, 0), GetArg(args, 1), GetArg(args, 2))),
+            PdVmBuiltin.MapEdit => ReturnOne(MapEditValue(GetArg(args, 0), GetArg(args, 1), GetArg(args, 2), GetArg(args, 3))),
             PdVmBuiltin.Keys => ReturnOne(KeysValue(GetArg(args, 0))),
             PdVmBuiltin.BytesFromUtf8 => ReturnOne(BytesFromUtf8Value(GetArg(args, 0))),
             PdVmBuiltin.BytesToUtf8 => ReturnOne(BytesToUtf8Value(GetArg(args, 0))),
@@ -582,7 +607,7 @@ public static class PdVmBuiltins
                 or PdVmBuiltin.MapIterClose
                 or PdVmBuiltin.BindCallable
                 or PdVmBuiltin.DetachLocal => throw new NotSupportedException(
-                    $"builtin {builtin} requires the VMBC v13 callable runtime"),
+                    $"builtin {builtin} requires the VMBC v14 callable runtime"),
             PdVmBuiltin.JitSetConfig
                 or PdVmBuiltin.JitGetConfig
                 or PdVmBuiltin.JitSetEnabled

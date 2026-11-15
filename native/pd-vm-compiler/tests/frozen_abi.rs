@@ -1,4 +1,4 @@
-//! Frozen core/pd-edge ABI 25 pin proofs and the checked-in example corpus.
+//! Frozen core/pd-edge ABI 26 pin proofs and the checked-in example corpus.
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -7,11 +7,11 @@ use std::ptr;
 use edge::{ABI_VERSION, function_by_name, host_namespace_specs};
 use pd_vm_compiler::compile_edge_source_file;
 
-const FROZEN_CORE_REV: &str = "b1d6cffede77f49410bf63525f30b9a46b02dc01";
+const FROZEN_CORE_REV: &str = "8db4583298cce9806d617322606537e6344c8b6e";
 const FROZEN_CORE_URL: &str = "https://github.com/rustscript-lang/rustscript.git";
-const FROZEN_EDGE_REV: &str = "5f4f889e349bdfbd5534deb42bd13b616a6114f5";
+const FROZEN_EDGE_REV: &str = "1ab0decfce82d5dbeedad36218a5648dd8864527";
 const FROZEN_EDGE_URL: &str = "https://github.com/rustscript-lang/pd-edge.git";
-const FROZEN_EDGE_ABI: u16 = 25;
+const FROZEN_EDGE_ABI: u16 = 26;
 const EXPECTED_EXAMPLES: usize = 7;
 
 fn manifest_dir() -> PathBuf {
@@ -361,7 +361,7 @@ fn ci_resolves_pins_from_cargo_and_does_not_use_sibling_checkouts() {
 }
 
 #[test]
-fn edge_abi_is_version_25_with_typed_http_catalog_and_named_mqtt_event_surface() {
+fn edge_abi_is_version_26_with_typed_http_catalog_and_named_mqtt_event_surface() {
     assert_eq!(ABI_VERSION, FROZEN_EDGE_ABI);
     let namespaces: Vec<&str> = host_namespace_specs()
         .iter()
@@ -376,8 +376,8 @@ fn edge_abi_is_version_25_with_typed_http_catalog_and_named_mqtt_event_surface()
 
     let manifest = edge::abi_json();
     assert!(
-        manifest.contains("\"abi_version\": 25"),
-        "published ABI JSON must record version 25"
+        manifest.contains("\"abi_version\": 26"),
+        "published ABI JSON must record version 26"
     );
 
     if let Some(function) = function_by_name("mqtt::connection::next_event") {
@@ -427,8 +427,8 @@ fn native_compiler_compiles_and_executes_the_non_overlay_example_corpus() {
         );
         assert_eq!(
             u16::from_le_bytes(vmbc[4..6].try_into().expect("VMBC version bytes")),
-            13,
-            "{} must emit VMBC v13",
+            14,
+            "{} must emit VMBC v14",
             path.display()
         );
         compiled.push((path.clone(), program, source));

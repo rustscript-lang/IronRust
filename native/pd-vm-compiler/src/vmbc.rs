@@ -9,7 +9,7 @@ pub fn encode_program(mut program: Program) -> Result<Vec<u8>, String> {
             }
         }
     }
-    crate::wire::encode_program(&program).map_err(|error| error.to_string())
+    vm::encode_program(&program).map_err(|error| error.to_string())
 }
 
 fn repair_utf8_mojibake(value: &str) -> std::borrow::Cow<'_, str> {
