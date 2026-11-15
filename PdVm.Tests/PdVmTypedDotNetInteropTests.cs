@@ -354,13 +354,13 @@ public sealed class PdVmTypedDotNetInteropTests
             "let controls = Form::GetFormControls(form);\n" +
             "ControlCollection::Add(controls, button);\n" +
             "ControlCollection::Add(controls, label);\n" +
-            "fn on_click() -> null {\n" +
+            "fn on_click() -> () {\n" +
             "    Label::SetLabelText(label, \"updated\");\n" +
             $"        File::WriteAllText(\"{signalPath.Replace('\\', '/')}\", Label::GetLabelText(label));\n" +
             "    Ui::Close(form);\n" +
-            "    null\n" +
+            "    ()\n" +
             "}\n" +
-            "fn on_shown() -> null { Button::PerformClick(button); null }\n" +
+            "fn on_shown() -> () { Button::PerformClick(button); () }\n" +
             "Ui::BindClick(form, button, on_click);\n" +
             "Ui::BindShown(form, on_shown);\n" +
             "Ui::Show(form);\n");
@@ -1014,7 +1014,7 @@ public sealed class PdVmTypedDotNetInteropTests
             "use System::Windows::Forms::Form;\n" +
             "use System::Windows::EventLoop as Ui;\n" +
             "let form = Form::NewForm();\n" +
-            "fn on_close() -> null { Ui::Close(form); null }\n" +
+            "fn on_close() -> () { Ui::Close(form); () }\n" +
             "Ui::BindClosing(form, on_close);\n" +
             "Ui::Show(form);\n");
 
@@ -1148,10 +1148,10 @@ public sealed class PdVmTypedDotNetInteropTests
             "use System::Windows::Forms::Form;\n" +
             "use System::Windows::EventLoop as Ui;\n" +
             "let form = Form::NewForm();\n" +
-            "fn on_tick() -> null {\n" +
+            "fn on_tick() -> () {\n" +
             $"    File::WriteAllText(\"{signalPath.Replace('\\', '/')}\", \"tick\");\n" +
             "    Ui::Close(form);\n" +
-            "    null\n" +
+            "    ()\n" +
             "}\n" +
             "Ui::BindTimer(form, 10, on_tick);\n" +
             "Ui::Show(form);\n");

@@ -70,7 +70,7 @@ must be treated as one versioned contract:
 - `Call` remains direct builtin or host-import dispatch.
 - `CallValue` is opcode `0x19` with one `argc: u8` operand.
 - the stack segment before `CallValue` is `callee, arg0, ..., argN`;
-- a completed callable invocation leaves exactly one result, using `null` for unit;
+- a completed callable invocation leaves exactly one result, using `()` for unit;
 - `Ret` completes the active frame and follows its typed continuation;
 - branches remain inside the active function region;
 - callable constants are invalid;
@@ -380,7 +380,7 @@ RSS execution begins after the originating UI event returns while remaining on t
 Typed UI bindings execute directly against their owning controls; there is no centralized hidden
 window or dedicated dispatcher thread.
 
-Generated `EventLoop` declarations type callback parameters as `fn(...) -> null`. RSS therefore
+Generated `EventLoop` declarations type callback parameters as `fn(...) -> ()`. RSS therefore
 passes the callable value itself, for example `Ui::BindClick(form, button, on_click)`. The CLR host
 converts that VM value to `PdVmCallableValue`, validates its Program generation and signature, and
 retains it in the form session; no export-name lookup occurs at the binding point.
@@ -390,8 +390,9 @@ retains it in the form session; no export-name lookup occurs at the binding poin
 RSS source:
 
 ```rust
-pub fn on_click() -> null {
+pub fn on_click() -> () {
     System::Windows::Forms::MessageBox::Show("Called from RSS");
+    ()
 }
 
 Ui::BindClick(form, button, on_click);

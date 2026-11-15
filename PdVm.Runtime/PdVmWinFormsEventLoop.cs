@@ -94,7 +94,7 @@ public static class PdVmWinFormsEventLoop
     public static void BindClick(
         object form,
         object control,
-        [PdVmInteropSchema("fn() -> null")] PdVmCallableValue callable)
+        [PdVmInteropSchema("fn() -> ()")] PdVmCallableValue callable)
     {
         var session = PdVmWinFormsApplication.RequireCurrent();
         var callback = session.CreateUnitCallback(form, callable);
@@ -108,19 +108,19 @@ public static class PdVmWinFormsEventLoop
         object form,
         object control,
         object dialog,
-        [PdVmInteropSchema("fn() -> null")] PdVmCallableValue callable) =>
+        [PdVmInteropSchema("fn() -> ()")] PdVmCallableValue callable) =>
         BindClick(form, control, callable);
 
     public static void BindAction(
         object form,
         object control,
-        [PdVmInteropSchema("fn(map<string>) -> null")] PdVmCallableValue callable,
+        [PdVmInteropSchema("fn(map<string>) -> ()")] PdVmCallableValue callable,
         string action) =>
         BindEventAction(form, control, "Click", callable, action);
 
     public static void BindShown(
         object form,
-        [PdVmInteropSchema("fn() -> null")] PdVmCallableValue callable)
+        [PdVmInteropSchema("fn() -> ()")] PdVmCallableValue callable)
     {
         var session = PdVmWinFormsApplication.RequireCurrent();
         var callback = session.CreateUnitCallback(form, callable);
@@ -132,7 +132,7 @@ public static class PdVmWinFormsEventLoop
 
     public static void BindShownAction(
         object form,
-        [PdVmInteropSchema("fn(map<string>) -> null")] PdVmCallableValue callable,
+        [PdVmInteropSchema("fn(map<string>) -> ()")] PdVmCallableValue callable,
         string action) =>
         BindEventAction(form, form, "Shown", callable, action);
 
@@ -156,31 +156,31 @@ public static class PdVmWinFormsEventLoop
     public static void BindMouseDown(
         object form,
         object control,
-        [PdVmInteropSchema("fn(map<string>) -> null")] PdVmCallableValue callable) =>
+        [PdVmInteropSchema("fn(map<string>) -> ()")] PdVmCallableValue callable) =>
         BindPointerEvent(form, control, "MouseDown", callable, hasCoordinates: true, action: string.Empty);
 
     public static void BindMouseUp(
         object form,
         object control,
-        [PdVmInteropSchema("fn(map<string>) -> null")] PdVmCallableValue callable) =>
+        [PdVmInteropSchema("fn(map<string>) -> ()")] PdVmCallableValue callable) =>
         BindPointerEvent(form, control, "MouseUp", callable, hasCoordinates: true, action: string.Empty);
 
     public static void BindMouseDoubleClick(
         object form,
         object control,
-        [PdVmInteropSchema("fn(map<string>) -> null")] PdVmCallableValue callable) =>
+        [PdVmInteropSchema("fn(map<string>) -> ()")] PdVmCallableValue callable) =>
         BindPointerEvent(form, control, "MouseDoubleClick", callable, hasCoordinates: true, action: string.Empty);
 
     public static void BindMouseLeave(
         object form,
         object control,
-        [PdVmInteropSchema("fn(map<string>) -> null")] PdVmCallableValue callable) =>
+        [PdVmInteropSchema("fn(map<string>) -> ()")] PdVmCallableValue callable) =>
         BindPointerEvent(form, control, "MouseLeave", callable, hasCoordinates: false, action: string.Empty);
 
     public static void BindPointer(
         object form,
         object control,
-        [PdVmInteropSchema("fn(map<string>) -> null")] PdVmCallableValue callable)
+        [PdVmInteropSchema("fn(map<string>) -> ()")] PdVmCallableValue callable)
     {
         BindPointerEvent(form, control, "MouseDown", callable, hasCoordinates: true, action: "board_down");
         BindPointerEvent(form, control, "MouseUp", callable, hasCoordinates: true, action: "board_up");
@@ -190,7 +190,7 @@ public static class PdVmWinFormsEventLoop
 
     public static void BindClosing(
         object form,
-        [PdVmInteropSchema("fn() -> null")] PdVmCallableValue callable)
+        [PdVmInteropSchema("fn() -> ()")] PdVmCallableValue callable)
     {
         var session = PdVmWinFormsApplication.RequireCurrent();
         var state = GetState(form);
@@ -207,7 +207,7 @@ public static class PdVmWinFormsEventLoop
 
     public static void BindClosingAction(
         object form,
-        [PdVmInteropSchema("fn(map<string>) -> null")] PdVmCallableValue callable,
+        [PdVmInteropSchema("fn(map<string>) -> ()")] PdVmCallableValue callable,
         string action)
     {
         ArgumentNullException.ThrowIfNull(action);
@@ -227,7 +227,7 @@ public static class PdVmWinFormsEventLoop
     public static void BindTimer(
         object form,
         long intervalMilliseconds,
-        [PdVmInteropSchema("fn() -> null")] PdVmCallableValue callable)
+        [PdVmInteropSchema("fn() -> ()")] PdVmCallableValue callable)
     {
         BindTimerCore(form, intervalMilliseconds, callable, action: null);
     }
@@ -235,7 +235,7 @@ public static class PdVmWinFormsEventLoop
     public static void BindTimerAction(
         object form,
         long intervalMilliseconds,
-        [PdVmInteropSchema("fn(map<string>) -> null")] PdVmCallableValue callable,
+        [PdVmInteropSchema("fn(map<string>) -> ()")] PdVmCallableValue callable,
         string action)
     {
         ArgumentNullException.ThrowIfNull(action);

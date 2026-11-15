@@ -37,10 +37,10 @@ let name = Path::GetFileName("scripts/main.rss");
 The generated `System/Console.rss` module is conceptually:
 
 ```rust
-pub fn __clr_b_17d84a(value: string) -> null;
+pub fn __clr_b_17d84a(value: string) -> ();
 
-pub fn WriteLine(value: string) -> null {
-    __clr_b_17d84a(value);
+pub fn WriteLine(value: string) -> () {
+    __clr_b_17d84a(value)
 }
 ```
 
@@ -108,7 +108,7 @@ Ambiguity is a compile-wrapper diagnostic that lists candidate signatures and th
 
 | CLR metadata type | RustScript schema | Runtime representation |
 | --- | --- | --- |
-| `void` | `null` | one RustScript `null` result |
+| `void` | `()` | one RustScript `()` result |
 | integral primitives | `int` | checked conversion to `i64` |
 | floating primitives | `float` | `f64` |
 | `bool` | `bool` | Boolean |
@@ -116,7 +116,7 @@ Ambiguity is a compile-wrapper diagnostic that lists candidate signatures and th
 | `byte[]` | `bytes` | byte buffer |
 | supported arrays/lists | `[T]` | RustScript array |
 | supported dictionaries | `map<T>` | RustScript map |
-| nullable/reference optional | `T?` where supported | value or `null` |
+| nullable/reference optional | `Option<T>` where supported | `Some(value)` or `None` |
 | other reference types | `int` initially | checked CLR object handle |
 
 Conversions that lose range or precision are rejected unless the binding profile explicitly permits them.
