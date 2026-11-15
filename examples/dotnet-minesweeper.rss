@@ -422,7 +422,7 @@ let mut flagged = new_board_array(64);
 let mut display = new_board_array(64);
 let mut flash_cells = new_board_array(64);
 
-fn render_board(render_rows: int, render_columns: int, render_paused: bool, render_flash_until: int, render_pressed_index: int) -> null {
+fn render_board(render_rows: int, render_columns: int, render_paused: bool, render_flash_until: int, render_pressed_index: int) -> () {
     // These arrays are resized when the difficulty changes. Borrow the root
     // slots so this renderer observes the replacement arrays instead of the
     // 8x8 values captured during startup.
@@ -445,10 +445,10 @@ fn render_board(render_rows: int, render_columns: int, render_paused: bool, rend
         render_index = render_index + 1;
     }
     render_styles = Scene::Present(board_surface, render_styles);
-    null
+    ()
 }
 
-fn reset_game() -> null {
+fn reset_game() -> () {
     let mut game = &mut state;
     game.active = true;
     game.started = false;
@@ -471,10 +471,10 @@ fn reset_game() -> null {
     Visuals::SetControlBitmap(face, smile_bitmap);
     ToolStripMenuItem::SetToolStripMenuItemChecked(pause_item, false);
     let _board_rendered = render_board((&game).rows, (&game).columns, (&game).paused, (&game).flash_until, (&game).pressed_index);
-    null
+    ()
 }
 
-fn select_difficulty(new_rows: int, new_columns: int, new_mine_total: int, new_difficulty: int) -> null {
+fn select_difficulty(new_rows: int, new_columns: int, new_mine_total: int, new_difficulty: int) -> () {
     let mut game = &mut state;
     game.rows = new_rows;
     game.columns = new_columns;
@@ -493,10 +493,10 @@ fn select_difficulty(new_rows: int, new_columns: int, new_mine_total: int, new_d
     ToolStripMenuItem::SetToolStripMenuItemChecked(expert_item, (&game).difficulty == 2);
     ToolStripMenuItem::SetToolStripMenuItemChecked(custom_item, (&game).difficulty == 3);
     let _game_reset = reset_game();
-    null
+    ()
 }
 
-fn open_cell(open_index: int) -> null {
+fn open_cell(open_index: int) -> () {
     let mut game = &mut state;
     if open_index >= 0 && (&game).active && !(&game).paused && (&flagged)[open_index] != 1 && (&revealed)[open_index] == 0 {
         if !(&game).started {
@@ -616,10 +616,10 @@ fn open_cell(open_index: int) -> null {
             }
         }
     }
-    null
+    ()
 }
 
-fn on_pause() -> null {
+fn on_pause() -> () {
     let mut game = &mut state;
     if (&game).active && (&game).started => {
         if (&game).paused {
@@ -635,26 +635,26 @@ fn on_pause() -> null {
         }
         ToolStripMenuItem::SetToolStripMenuItemChecked(pause_item, (&game).paused);
         let _board_rendered = render_board((&game).rows, (&game).columns, (&game).paused, (&game).flash_until, (&game).pressed_index);
-        null
-    } else => { null };
-    null
+        ()
+    } else => { () };
+    ()
 }
-fn on_beginner() -> null {
+fn on_beginner() -> () {
     let _difficulty_selected = select_difficulty(8, 8, 10, 0);
-    null
+    ()
 }
 
-fn on_intermediate() -> null {
+fn on_intermediate() -> () {
     let _difficulty_selected = select_difficulty(16, 16, 40, 1);
-    null
+    ()
 }
 
-fn on_expert() -> null {
+fn on_expert() -> () {
     let _difficulty_selected = select_difficulty(16, 30, 99, 2);
-    null
+    ()
 }
 
-fn on_custom() -> null {
+fn on_custom() -> () {
     let game = &state;
     let custom_values = show_custom_fields(form, (&game).rows, (&game).columns, (&game).mine_total);
     if custom_values[0] == "ok" {
@@ -671,9 +671,9 @@ fn on_custom() -> null {
             }
         }
     }
-    null
+    ()
 }
-fn on_marks() -> null {
+fn on_marks() -> () {
     let mut game = &mut state;
     game.marks_enabled = !(&game).marks_enabled;
     ToolStripMenuItem::SetToolStripMenuItemChecked(marks_item, (&game).marks_enabled);
@@ -692,9 +692,9 @@ fn on_marks() -> null {
     if board_changed {
         let _board_rendered = render_board((&game).rows, (&game).columns, (&game).paused, (&game).flash_until, (&game).pressed_index);
     }
-    null
+    ()
 }
-fn on_color() -> null {
+fn on_color() -> () {
     let mut game = &mut state;
     game.color_enabled = !(&game).color_enabled;
     ToolStripMenuItem::SetToolStripMenuItemChecked(color_item, (&game).color_enabled);
@@ -704,26 +704,26 @@ fn on_color() -> null {
         Scene::ConfigureStyles(board_surface, cell_border_styles, cell_backgrounds, cell_border_colors, monochrome_foregrounds, cell_texts, cell_sprites);
     }
     let _board_rendered = render_board((&game).rows, (&game).columns, (&game).paused, (&game).flash_until, (&game).pressed_index);
-    null
+    ()
 }
-fn on_best_times() -> null {
+fn on_best_times() -> () {
     let game = &state;
     let beginner_time = format_best_time((&game).beginner_best_time);
     let intermediate_time = format_best_time((&game).intermediate_best_time);
     let expert_time = format_best_time((&game).expert_best_time);
     Visuals::ShowMessage(form, "Beginner: " + beginner_time + " seconds\nIntermediate: " + intermediate_time + " seconds\nExpert: " + expert_time + " seconds", "Best Times");
-    null
+    ()
 }
-fn on_board_down(event: map<string>) -> null {
+fn on_board_down(event: map<string>) -> () {
     let mut game = &mut state;
     if event.button == "Left" && (&game).active && !(&game).paused => {
         game.pressed_index = board_index_at(parse_positive_int(event.x), parse_positive_int(event.y), (&game).rows, (&game).columns);
         let _board_rendered = render_board((&game).rows, (&game).columns, (&game).paused, (&game).flash_until, (&game).pressed_index);
-        null
-    } else => { null };
-    null
+        ()
+    } else => { () };
+    ()
 }
-fn on_board_up(event: map<string>) -> null {
+fn on_board_up(event: map<string>) -> () {
     let mut game = &mut state;
     let current_revealed = &revealed;
     let pointer_index = board_index_at(parse_positive_int(event.x), parse_positive_int(event.y), (&game).rows, (&game).columns);
@@ -759,9 +759,9 @@ fn on_board_up(event: map<string>) -> null {
         game.pressed_index = -1;
     }
     let _board_rendered = render_board((&game).rows, (&game).columns, (&game).paused, (&game).flash_until, (&game).pressed_index);
-    null
+    ()
 }
-fn on_board_double_click(event: map<string>) -> null {
+fn on_board_double_click(event: map<string>) -> () {
     let mut game = &mut state;
     let current_revealed = &revealed;
     let current_flagged = &flagged;
@@ -824,38 +824,38 @@ fn on_board_double_click(event: map<string>) -> null {
         }
         let _board_rendered = render_board((&game).rows, (&game).columns, (&game).paused, (&game).flash_until, (&game).pressed_index);
     }
-    null
+    ()
 }
-fn on_board_leave(event: map<string>) -> null {
+fn on_board_leave(event: map<string>) -> () {
     let mut game = &mut state;
     if (&game).pressed_index >= 0 {
         game.pressed_index = -1;
         let _board_rendered = render_board((&game).rows, (&game).columns, (&game).paused, (&game).flash_until, (&game).pressed_index);
     }
-    null
+    ()
 }
-fn release_game_resources() -> null {
+fn release_game_resources() -> () {
     let _random_released = Random::ReleaseRandom(random);
     Ui::Close(form);
-    null
+    ()
 }
 
-fn on_exit() -> null {
+fn on_exit() -> () {
     let _game_closed = release_game_resources();
-    null
+    ()
 }
 
-fn on_contents() -> null {
+fn on_contents() -> () {
     Visuals::ShowMessage(form, "Open every square that does not contain a mine.\nRight-click to place a flag or question mark.\nDouble-click a revealed number to open its remaining neighbors.", "Minesweeper Help");
-    null
+    ()
 }
 
-fn on_about() -> null {
+fn on_about() -> () {
     Visuals::ShowMessage(form, "Minesweeper\nRustScript game logic running on IronRust.", "About Minesweeper");
-    null
+    ()
 }
 
-fn on_timer_tick() -> null {
+fn on_timer_tick() -> () {
     let mut game = &mut state;
     let mut board_changed = false;
     if (&game).flash_until > 0 && MonotonicClock::GetMilliseconds() >= (&game).flash_until {
@@ -873,7 +873,7 @@ fn on_timer_tick() -> null {
     if board_changed {
         let _board_rendered = render_board((&game).rows, (&game).columns, (&game).paused, (&game).flash_until, (&game).pressed_index);
     }
-    null
+    ()
 }
 
 Ui::BindClick(form, face, reset_game);

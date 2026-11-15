@@ -90,15 +90,15 @@ SaveFileDialog::SetSaveFileDialogAddExtension(save_dialog, true);
 let font_dialog = FontDialog::NewFontDialog();
 let color_dialog = ColorDialog::NewColorDialog();
 
-fn on_new() -> null {
+fn on_new() -> () {
     RichTextBox::SetRichTextBoxText(editor, "");
     SaveFileDialog::SetSaveFileDialogFileName(save_dialog, "");
     Form::SetFormText(form, "Untitled - RustScript Notepad");
     ToolStripStatusLabel::SetToolStripStatusLabelText(status_label, "New document");
-    null
+    ()
 }
 
-fn on_open() -> null {
+fn on_open() -> () {
     if Ui::ShowDialog(form, open_dialog) == "OK" {
         let current_path = OpenFileDialog::GetOpenFileDialogFileName(open_dialog);
         SaveFileDialog::SetSaveFileDialogFileName(save_dialog, &current_path);
@@ -106,10 +106,10 @@ fn on_open() -> null {
         Form::SetFormText(form, (&current_path) + " - RustScript Notepad");
         ToolStripStatusLabel::SetToolStripStatusLabelText(status_label, "Opened " + current_path);
     }
-    null
+    ()
 }
 
-fn on_save() -> null {
+fn on_save() -> () {
     let mut current_path = SaveFileDialog::GetSaveFileDialogFileName(save_dialog);
     if current_path == "" {
         if Ui::ShowDialog(form, save_dialog) == "OK" {
@@ -121,44 +121,44 @@ fn on_save() -> null {
         Form::SetFormText(form, (&current_path) + " - RustScript Notepad");
         ToolStripStatusLabel::SetToolStripStatusLabelText(status_label, "Saved " + current_path);
     }
-    null
+    ()
 }
 
-fn on_save_as() -> null {
+fn on_save_as() -> () {
     if Ui::ShowDialog(form, save_dialog) == "OK" {
         let current_path = SaveFileDialog::GetSaveFileDialogFileName(save_dialog);
         File::WriteAllText(&current_path, RichTextBox::GetRichTextBoxText(editor));
         Form::SetFormText(form, (&current_path) + " - RustScript Notepad");
         ToolStripStatusLabel::SetToolStripStatusLabelText(status_label, "Saved " + current_path);
     }
-    null
+    ()
 }
 
-fn on_font() -> null {
+fn on_font() -> () {
     if Ui::ShowDialog(form, font_dialog) == "OK" {
         RichTextBox::SetRichTextBoxFont(editor, FontDialog::GetFontDialogFont(font_dialog));
     }
-    null
+    ()
 }
 
-fn on_color() -> null {
+fn on_color() -> () {
     if Ui::ShowDialog(form, color_dialog) == "OK" {
         RichTextBox::SetRichTextBoxForeColor(editor, ColorDialog::GetColorDialogColor(color_dialog));
     }
-    null
+    ()
 }
 
-fn on_wrap() -> null {
+fn on_wrap() -> () {
     let word_wrap = !RichTextBox::GetRichTextBoxWordWrap(editor);
     RichTextBox::SetRichTextBoxWordWrap(editor, word_wrap);
     ToolStripMenuItem::SetToolStripMenuItemChecked(wrap_item, word_wrap);
     ToolStripStatusLabel::SetToolStripStatusLabelText(status_label, "Word wrap changed");
-    null
+    ()
 }
 
-fn on_close() -> null {
+fn on_close() -> () {
     Ui::Close(form);
-    null
+    ()
 }
 
 Ui::BindClick(form, new_item, || on_new());
