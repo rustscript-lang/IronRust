@@ -63,12 +63,12 @@ public sealed class PdVmWinFormsApplicationSession : IDisposable
         _onDispose = onDispose;
     }
 
-    public bool HasMainForm => _mainForm is not null;
+    public bool HasMainForm => Volatile.Read(ref _mainForm) is not null;
 
     public void RunMessageLoop()
     {
         EnsureUiThread();
-        var form = _mainForm ?? throw new InvalidOperationException(
+        var form = Volatile.Read(ref _mainForm) ?? throw new InvalidOperationException(
             "the RSS program did not register a main form with EventLoop::Show");
         var formType = Type.GetType(
             "System.Windows.Forms.Form, System.Windows.Forms",
@@ -95,7 +95,8 @@ public sealed class PdVmWinFormsApplicationSession : IDisposable
     {
         ArgumentNullException.ThrowIfNull(form);
         EnsureUiThread();
-        if (_mainForm is not null && !ReferenceEquals(_mainForm, form))
+        var existing = Volatile.Read(ref _mainForm);
+        if (existing is not null && !ReferenceEquals(existing, form))
         {
             throw new InvalidOperationException("a Windows Forms program can register only one main form");
         }
@@ -104,7 +105,47 @@ public sealed class PdVmWinFormsApplicationSession : IDisposable
             BindingFlags.Public | BindingFlags.Instance)?.GetValue(form) ??
             throw new InvalidOperationException(
                 $"{form.GetType().FullName} does not expose a window handle");
-        _mainForm = form;
+        Volatile.Write(ref _mainForm, form);
+    }
+
+    /// <summary>
+    /// Closes this session's main form so that <see cref="RunMessageLoop"/> returns.
+    /// Unlike <c>Application.Exit</c>, which tears down every message loop in the process,
+    /// this only ends the loop owned by this session and may be called from any thread.
+    /// </summary>
+    public bool CloseMainForm()
+    {
+        var form = Volatile.Read(ref _mainForm);
+        if (form is null)
+        {
+            return false;
+        }
+
+        var beginInvoke = form.GetType().GetMethod(
+            "BeginInvoke",
+            BindingFlags.Public | BindingFlags.Instance,
+            binder: null,
+            types: [typeof(Delegate)],
+            modifiers: null);
+        if (beginInvoke is null)
+        {
+            return false;
+        }
+
+        // Route through the same close path as EventLoop::Close so that a bound
+        // FormClosing callback does not veto the shutdown.
+        Action action = () => PdVmWinFormsEventLoop.Close(form);
+        try
+        {
+            _ = beginInvoke.Invoke(form, [action]);
+            return true;
+        }
+        catch (TargetInvocationException exception)
+            when (exception.InnerException is InvalidOperationException or ObjectDisposedException)
+        {
+            // The window handle is already gone, so the loop has nothing left to close.
+            return false;
+        }
     }
 
     internal PdVmScriptCallback<PdVmUnit, PdVmUnit> CreateUnitCallback(

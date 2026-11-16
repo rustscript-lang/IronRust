@@ -2,6 +2,7 @@ using PdVm.Runtime;
 
 namespace PdVm.Tests;
 
+[Collection(WinFormsCollection.Name)]
 public sealed class PdVmDotNetHostTests
 {
     [Fact]
@@ -67,7 +68,7 @@ public sealed class PdVmDotNetHostTests
         {
             try
             {
-                Assert.True(PdVmDotNetHost.InitializeWindowsFormsApplication());
+                Assert.True(WinFormsTestSupport.Initialize());
                 var host = new PdVmDotNetHost(allowDynamicSystemCalls: true);
                 Assert.True(host.CanResolveType("System.Windows.Forms.Form"));
                 var handle = ReturnValue(host.Call(

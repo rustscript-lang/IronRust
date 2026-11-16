@@ -4,6 +4,7 @@ using PdVm.Runtime;
 
 namespace PdVm.Tests;
 
+[Collection(WinFormsCollection.Name)]
 public sealed class PdVmTypedDotNetInteropTests
 {
     [Fact]
@@ -377,7 +378,7 @@ public sealed class PdVmTypedDotNetInteropTests
         {
             try
             {
-                _ = PdVmDotNetHost.InitializeWindowsFormsApplication();
+                _ = WinFormsTestSupport.Initialize();
                 using var program = Assert.IsAssignableFrom<IPdVmCallableProgram>(
                     PdVmAssemblyLoader.CreateProgram(Assembly.Load(File.ReadAllBytes(output))));
                 var host = PdVmDefaultHost.CreateConsoleHost();
@@ -386,7 +387,7 @@ public sealed class PdVmTypedDotNetInteropTests
                 using var application = PdVmWinFormsApplication.Attach(program, host);
                 _ = PdVmExecution.Run(program, host);
                 using var watchdog = new System.Threading.Timer(
-                    _ => ExitWindowsFormsApplication(),
+                    _ => application.CloseMainForm(),
                     null,
                     TimeSpan.FromSeconds(3),
                     Timeout.InfiniteTimeSpan);
@@ -1170,7 +1171,7 @@ public sealed class PdVmTypedDotNetInteropTests
             {
                 try
                 {
-                    _ = PdVmDotNetHost.InitializeWindowsFormsApplication();
+                    _ = WinFormsTestSupport.Initialize();
                     using var program = Assert.IsAssignableFrom<IPdVmCallableProgram>(
                         PdVmAssemblyLoader.CreateProgram(Assembly.Load(File.ReadAllBytes(output))));
                     var host = PdVmDefaultHost.CreateConsoleHost();
@@ -1179,7 +1180,7 @@ public sealed class PdVmTypedDotNetInteropTests
                     using var application = PdVmWinFormsApplication.Attach(program, host);
                     _ = PdVmExecution.Run(program, host);
                     using var watchdog = new System.Threading.Timer(
-                        _ => ExitWindowsFormsApplication(),
+                        _ => application.CloseMainForm(),
                         null,
                         TimeSpan.FromSeconds(3),
                         Timeout.InfiniteTimeSpan);
@@ -1253,18 +1254,6 @@ public sealed class PdVmTypedDotNetInteropTests
             BindingFlags.Instance | BindingFlags.NonPublic)!;
         return Assert.IsType<PdVmProgramMetadata>(metadataField.GetValue(program));
     }
-
-    private static void ExitWindowsFormsApplication() =>
-        Type.GetType(
-                "System.Windows.Forms.Application, System.Windows.Forms",
-                throwOnError: true)!
-            .GetMethod(
-                "Exit",
-                BindingFlags.Public | BindingFlags.Static,
-                binder: null,
-                types: Type.EmptyTypes,
-                modifiers: null)!
-            .Invoke(null, null);
 
     private static async Task WaitUntilAsync(Func<bool> condition)
     {

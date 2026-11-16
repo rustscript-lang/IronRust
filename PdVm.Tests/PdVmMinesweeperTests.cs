@@ -5,6 +5,7 @@ using PdVm.Runtime;
 
 namespace PdVm.Tests;
 
+[Collection(WinFormsCollection.Name)]
 public sealed class PdVmMinesweeperTests
 {
     [Fact]
@@ -65,7 +66,7 @@ public sealed class PdVmMinesweeperTests
             {
                 try
                 {
-                    PdVmDotNetHost.InitializeWindowsFormsApplication();
+                    _ = WinFormsTestSupport.Initialize();
                     using var program = Assert.IsAssignableFrom<IPdVmCallableProgram>(
                         PdVmAssemblyLoader.CreateProgram(Assembly.Load(File.ReadAllBytes(outputPath))));
                     var host = PdVmDefaultHost.CreateConsoleHost();
